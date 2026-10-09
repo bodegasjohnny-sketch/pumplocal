@@ -45,6 +45,8 @@ def dec(value):
         d = Decimal(str(value))
     else:
         s = str(value).strip().replace(",", "")
+        if re.search(r"\d\s*[eE]\s*[+-]?\d", s):
+            return None  # "1e9" is not 1 (stress test Oct 9: typed 1e9 L was saved as 1.000 L)
         s = re.sub(r"(?i)php|pesos?|liters?|litres?|ltrs?|/l\b|[₱P\sL]", "", s)
         m = re.search(r"-?\d+(?:\.\d+)?", s)
         if not m:
@@ -159,6 +161,20 @@ def count_cash(counts):
         c = Decimal(0)
     total += c
     return {"lines": lines, "coins": str(q2(c)), "total": str(q2(total))}, errors
+
+
+def cash_input_errors(declared, opening_float=None, noncash=None):
+    """Typed cash-check values must be numbers of zero or more (stress test Oct 9: -5 and 'zz' were accepted)."""
+    errors = []
+    for label, v in (("Declared cash", declared), ("Opening float", opening_float), ("GCash / card", noncash)):
+        if v in (None, ""):
+            continue
+        d = dec(v)
+        if d is None or d < 0 or not re.fullmatch(r"\s*[₱P]?\s*[\d,]*\.?\d*\s*", str(v)):
+            errors.append("%s must be a peso amount of zero or more." % label)
+        elif d > Decimal("100000000"):
+            errors.append("%s looks too large. Please check." % label)
+    return errors
 
 
 def compute_cash(sales_total, declared, opening_float=0, noncash=0, tolerance=None, discounts=0, credit=0,
@@ -374,6 +390,18 @@ def last_price(fuel):
     return r[0]["price_per_liter"] if r else get_setting("price:%s" % fuel)
 
 
+MAX_SALE_LITERS = Decimal("10000")   # one sale; a big tanker fill is well under this (stress test Oct 9: 1e9 L saved)
+MAX_SALE_PESOS = Decimal("1000000")
+
+
+def _row_id(value):
+    """An id from the API as int, or None ('abc', None, 1.5 -> None)."""
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
 def save_sale(data, shift_id=None, created_at=None):
     """A sale. Optional discount (pesos + reason suki/senior/pwd/other) and payment 'credit' (utang, with customer).
     amount_pesos is the gross pump amount; the discount is what the customer did not pay."""
@@ -392,6 +420,8 @@ def save_sale(data, shift_id=None, created_at=None):
                       "Enter the amount (and the price per liter if this fuel has no sale yet).")
     if payment == "credit" and not customer:
         errors.append("Customer name is required for a credit (utang) sale.")
+    if rec["liters"] and (Decimal(rec["liters"]) > MAX_SALE_LITERS or Decimal(rec["amount_pesos"] or 0) > MAX_SALE_PESOS):
+        errors.append("One sale of %s L / %s is too large. Please check the numbers." % (rec["liters"], peso(rec["amount_pesos"])))
     disc_raw = data.get("discount_pesos")
     disc = dec(disc_raw) if disc_raw not in (None, "") else Decimal(0)
     reason = str(data.get("discount_reason") or "").strip().lower()
@@ -419,6 +449,9 @@ def save_sale(data, shift_id=None, created_at=None):
 
 
 def void_sale(sale_id):
+    sale_id = _row_id(sale_id)
+    if sale_id is None:
+        return ["Choose a sale to void."]
     execute("UPDATE sales SET voided=1, synced=0 WHERE id=?", (int(sale_id),))
 
 
@@ -628,13 +661,22 @@ def set_price_change(fuel, old_price, new_price, shift_id=None):
     if not fuel:
         return ["Choose the fuel."]
     if old_price in (None, "") and new_price in (None, ""):
+        was = get_price_change(fuel, shift_id)
+        if was:  # undo: the posted price goes back to the old one
+            set_setting("price:%s" % fuel, str(q2(Decimal(was["old"]))))
         del_setting(_price_key(shift_id, fuel))
         return []
     o, n = dec(old_price), dec(new_price)
     if o is None or n is None or o <= 0 or n <= 0:
         return ["Enter both the old and the new price per liter."]
     set_setting(_price_key(shift_id, fuel), "%s,%s" % (q2(o), q2(n)))
+    set_setting("price:%s" % fuel, str(q2(n)))  # the new price is the station's posted price from now on
     return []
+
+
+def posted_price(fuel):
+    """Station-wide posted price per liter (kept across shifts), or None."""
+    return dec(get_setting("price:%s" % normalize_fuel(fuel)))
 
 
 def get_price_change(fuel, shift_id):
@@ -1103,8 +1145,10 @@ def pump_check(shift_id=None, tolerance_pct=None):
                 item["headline_tl"] += " (Kulang pa ang reading ng %s.)" % " at ".join(
                     "peso" if w == "amount" else "litro" for w in waiting)
             if item["liters"] and item["pesos"]:
+                posted = posted_price(fuel)  # new shift, no sales yet: compare with the posted price (Oct 9 bug)
                 item["price"] = price_check(item["pesos"]["dispensed"], item["liters"]["dispensed"],
-                                            sorted(sold["prices"]), item["price_change"])
+                                            sorted(sold["prices"]) or ([posted] if posted else []),
+                                            item["price_change"])
         out.append(item)
     return {"shift_id": sid, "tolerance_pct": str(tol), "price_tolerance": str(q2(PRICE_TOLERANCE)), "pumps": pumps,
             "groups": out, "flagged": [g for g in out if g.get("flag")], "counters_only": counters_only,
@@ -1132,12 +1176,24 @@ def save_expense(data, shift_id=None, created_at=None):
 
 
 def void_expense(expense_id):
+    expense_id = _row_id(expense_id)
+    if expense_id is None:
+        return ["Choose an expense to void."]
     execute("UPDATE expenses SET voided=1, synced=0 WHERE id=?", (int(expense_id),))
 
 
 # ---------------------------------------------------------------- shift closing slip (paper) vs this shift
 def _name_tokens(name):
     return {t for t in re.findall(r"[a-z0-9]+", (name or "").lower()) if len(t) >= 2}
+
+
+def _clean_slip(slip):
+    """Edited slip from the browser: keep only a dict with lists of dict items (garbage gave a 500, Oct 9)."""
+    slip = dict(slip) if isinstance(slip, dict) else {}
+    for k in ("expenses", "credits"):
+        v = slip.get(k)
+        slip[k] = [x for x in v if isinstance(x, dict)] if isinstance(v, list) else []
+    return slip
 
 
 def slip_compare(slip, shift_id=None):
@@ -1148,6 +1204,7 @@ def slip_compare(slip, shift_id=None):
     Discounts: the slip's total is compared with the discounts typed on sales. On Confirm it is saved for the shift,
     and the shift counts the LARGER of the two (never both), see shift_summary.
     The preview is the cash check as it would be after saving the new items. Pure code."""
+    slip = _clean_slip(slip)
     s = shift_summary(shift_id)
     free_exp = [dict(e) for e in s["expenses"]]
     expenses = []
@@ -1207,6 +1264,7 @@ def slip_compare(slip, shift_id=None):
 def slip_apply(slip, shift_id=None):
     """Save the slip's NEW expenses and credit sales (items already recorded are skipped, so pressing confirm
     twice adds nothing). Returns {"saved_expenses", "saved_credits", "skipped", "errors"}."""
+    slip = _clean_slip(slip)
     cmp_ = slip_compare(slip, shift_id)
     saved_e, saved_c, skipped, errors = [], [], [], []
     for e in cmp_["expenses"]:

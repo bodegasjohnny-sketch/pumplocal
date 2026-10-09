@@ -202,7 +202,8 @@ def extract(image_b64):
         return {"ok": False, "fields": {"fuel_type": "", "liters": None, "price_per_liter": None,
                                         "amount_pesos": None},
                 "raw": raw[:500], "notes": [], "warnings": [],
-                "message": "Could not read values from the photo. Please type them in.",
+                "message": "Could not read values from the photo. Please type them in. (A pump totalizer photo goes on "
+                           "the Pump tab; a closing slip on the Cash tab.)",
                 "seconds": round(time.time() - t0, 1), "reader": "gemma", "source": model_label()}
     f = fields_from_obj(obj)
     rec = core.reconcile(f["liters"], f["price_per_liter"], f["amount_pesos"])
@@ -239,7 +240,8 @@ def _vision_result(p, lines, seconds):
     elif found_any:
         msg = "Some values were not readable or don't add up. Please check and fill them in."
     else:
-        msg = "Could not read values from the photo. Please type them in."
+        msg = ("Could not read values from the photo. Please type them in. (A pump totalizer photo goes on the Pump "
+               "tab; a closing slip on the Cash tab.)")
     if p["consistent"] and not fields["fuel_type"]:
         msg += " Choose the fuel type."
     notes = p["notes"] + [n for n in rec["notes"] if n not in p["notes"]]
@@ -316,9 +318,16 @@ MOCK_TOTALIZER = ('Here is the totalizer:\n```json\n{"screen_title": "2.Money Al
                   '"volume": null, "pump_label": "DIESEL 2"}\n```')
 
 
+SALE_DOC = re.compile(r"PRICE\s*(PER|/)|\bINVOICE\b|\bRECEIPT\b|\bCHANGE:|\bTOTAL:", re.I)
+
+
 def _totalizer_result(p, raw, seconds, reader, source):
     ok = p["reading"] is not None
-    if ok:
+    sale_doc = bool(SALE_DOC.search(raw or ""))
+    if ok and sale_doc:  # stress test Oct 9: a sale meter/receipt on the Pump tab was read as a totalizer
+        msg = ("This looks like a sale meter or receipt (it shows a price per liter), not a pump totalizer. Use the "
+               "Photo tab for sales. · Mukhang resibo o metro ng benta ito, hindi totalizer.")
+    elif ok:
         msg = "Read from photo. Check the numbers, choose the pump and Opening/Closing, then save."
     else:
         msg = "Could not find a totalizer number in the photo. Please type it in."
@@ -328,7 +337,7 @@ def _totalizer_result(p, raw, seconds, reader, source):
             "counter_hint": p.get("counter_hint"), "counter_strong": p.get("counter_strong"),
             "counter_why": p.get("counter_why"),
             "raw": (raw or "")[:500], "message": msg, "seconds": round(seconds, 1), "reader": reader,
-            "source": source}
+            "source": source, "not_totalizer": sale_doc}
 
 
 def extract_totalizer(image_b64):

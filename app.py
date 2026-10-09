@@ -137,7 +137,9 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send_json({"error": " ".join(errors), "calc": calc}, 400)
                 return self.send_json({"sale": rec, "calc": calc, "sync": sync.status()})
             if path == "/api/sales/void":
-                core.void_sale(data.get("id"))
+                errors = core.void_sale(data.get("id"))
+                if errors:
+                    return self.send_json({"error": " ".join(errors)}, 400)
                 return self.send_json({"ok": True, "sync": sync.status()})
             if path == "/api/cash/count":
                 count, errors = core.count_cash(data.get("counts") or data)
@@ -155,6 +157,9 @@ class Handler(BaseHTTPRequestHandler):
                     declared = count["total"]  # the denomination count fills in declared cash
                 if core.dec(declared) is None:
                     return self.send_json({"error": "Enter the declared cash amount (or count the bills)."}, 400)
+                bad = core.cash_input_errors(declared, data.get("opening_float"), data.get("noncash"))
+                if bad:
+                    return self.send_json({"error": " ".join(bad)}, 400)
                 s = core.shift_summary()
                 result = core.compute_cash(s["total_amount"], declared, data.get("opening_float"),
                                            data.get("noncash"), discounts=s["discounts_total"],
@@ -175,7 +180,9 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send_json({"error": " ".join(errors)}, 400)
                 return self.send_json({"expense": rec, "sync": sync.status()})
             if path == "/api/expenses/void":
-                core.void_expense(data.get("id"))
+                errors = core.void_expense(data.get("id"))
+                if errors:
+                    return self.send_json({"error": " ".join(errors)}, 400)
                 return self.send_json({"ok": True, "sync": sync.status()})
             if path == "/api/expense/extract":
                 img = data.get("image") or ""

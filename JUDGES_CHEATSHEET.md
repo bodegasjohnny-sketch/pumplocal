@@ -121,7 +121,7 @@ percent       = difference ÷ expected × 100
    We did at first. On my 8 GB MacBook Air the first photo took over 4 minutes and timed out. Apple Vision OCR is built into macOS, runs on-device, and read a photo in **1.8 s** when I timed it on my MacBook Air (one measurement, by hand). Code then checks the numbers. Gemma is kept as the fallback.
 
 3. **"How accurate is the photo reading?"**
-   Honest answer: **not benchmarked.** It's tested on three synthetic images, the text of one real totalizer photo, and a full closing sheet, which must be *refused* rather than read. Every value is shown in an editable form, and staff must confirm before saving. The 1 % liters × price check catches many misreads.
+   Honest answer: **not benchmarked.** It's tested on synthetic meter/receipt images, the 4 real Premium 3 totalizer photos (including the exact Apple Vision text from my Mac), and a full closing sheet, which must be *refused* rather than read. Every value is shown in an editable form, and staff must confirm before saving. The 1 % liters × price check catches many misreads.
 
 4. **"Is it really local / offline?"**
    Yes. Vision OCR is part of macOS, Gemma runs in Ollama on the laptop, and data is in a SQLite file. The only network call is the optional sync to `SYNC_URL`. I can demo it with Wi-Fi off.
@@ -150,7 +150,7 @@ percent       = difference ÷ expected × 100
    Grok Bot, an AI coding assistant, wrote essentially all of it from my direction. I supplied the station's real problems and photos, tested on my Mac, and made the decisions. Devin was tried but had no credits left, so it wrote nothing. Claude only helped clean up my Mac. All of this is in `BUILD_LOG.md`.
 
 11. **"How do you know it works?"**
-    There are 135 automated tests (`MOCK_AI=1 python3 -m unittest discover -s tests`). They start the real server, call every endpoint, and test the parsers, the math, sync (with a fake server), a fake Ollama, and Ollama being down. **Caveat:** the tests run on Linux, so Apple Vision itself is replaced by a stand-in that returns recorded OCR text. The real Vision path has only been tried by hand on my Mac.
+    There are 169 automated tests (`MOCK_AI=1 python3 -m unittest discover -s tests`). They start the real server, call every endpoint, and test the parsers, the math, sync (with a fake server), a fake Ollama, and Ollama being down. **Caveat:** the tests run on Linux, so Apple Vision itself is replaced by a stand-in that returns recorded OCR text. The real Vision path has only been tried by hand on my Mac.
 
 ### If they push further
 
@@ -158,3 +158,52 @@ percent       = difference ÷ expected × 100
   - Known gap: if a row is edited *while* a sync is in flight, it can be marked synced without its latest edit being sent.
 - **Why stdlib Python?** Nothing to `pip install`; `python3 app.py` runs on a stock Mac. Fewer things break at a remote station.
 - **Why not OCR the handwritten closing sheet?** Handwriting is unreliable, and the goal is to replace the sheet with the pump's own numbers, not digitize it.
+
+## 7. Loopholes & live Q&A (from the Oct 9 stress test)
+
+I tried to break the live app: bad numbers, double-clicks, wrong photos, a new shift mid-demo, a restart, Ollama stopped. Honest answers, weaknesses included.
+
+1. **"What if staff just don't record the sale and also skip the photo?"**
+   That's exactly what the pump counters catch: the totalizer keeps counting whether anyone records the sale or not, so closing − opening shows more fuel left the pump than was recorded (red "unaccounted"). **Weakness:** it only works if someone photographs (or types) the opening and closing totalizer each shift. Skip that, and there is nothing to compare.
+
+2. **"Can staff edit the readings?"**
+   Yes, on purpose: OCR can misread, so every field is editable. Each reading shows where it came from (photo, typed, or carried over from last shift). **Weakness:** a re-saved reading overwrites the old one; there's no edit history yet, and the photo itself isn't stored.
+
+3. **"What stops someone from deleting data?"**
+   There's no delete button: "void" only marks a sale or expense as voided; it stays in the database and is queued for sync. **Weakness:** no logins and no roles, so anyone at the laptop can void, and someone with file access could delete the SQLite file. Sync to an owner's server is the backstop, and it's not authenticated yet.
+
+4. **"How accurate is the OCR?"**
+   Not benchmarked. It reads the 4 real Premium 3 photos and the synthetic samples correctly, and every value is shown for staff to check before saving. On the Pump tab, a reading is also checked against the pump's other reading: if it can't be liters (e.g. 2,563,201 L in one shift), the app says so and offers ⇄ Move, or asks "Is this pesos or liters?".
+
+5. **"Why not just use the cloud?"**
+   The station's internet is unreliable, and the owner's sales data stays on the station's laptop. Everything (OCR, math, the AI) runs offline; sync is optional and queues until it's online.
+
+6. **"What happens on a counter rollover?"**
+   A closing lower than the opening is never counted as a negative sale. The app shows "Opening is higher than closing. Swap them? (Could also mean the counter rolled over or was reset.)" with a one-tap swap. **Weakness:** a true rollover has to be entered by hand.
+
+7. **"Is the AI making up numbers?"**
+   The quick-question chips are answered by code. For free-form questions Gemma gets only the computed numbers, and any number in its reply that isn't in that data is flagged ("⚠️ Check: … not found in this shift's data"). All math is code (`Decimal`).
+
+8. **"Will the AI accuse my staff?"**
+   No. Why-questions ask Gemma for neutral causes (an unrecorded sale, an unlogged test pour, calibration, a counting error) plus a check, and a code filter replaces any reply that mentions stealing or theft (nagnakaw, ninakaw, steal, theft…).
+
+9. **"What if Gemma is slow or Ollama is off?"**
+   Photos use Apple Vision first (no Gemma). If Ollama is off, Ask and the cash note fall back to template answers from the computed numbers, and the app says "Local AI unavailable". **Weakness:** if Ollama is running but hung, the app waits up to `AI_TIMEOUT` (600 s by default, because the first model load on an 8 GB Mac is slow) before falling back.
+
+10. **"What if someone uploads the wrong photo?"**
+    A random image or a totalizer on the Photo tab gives "Could not read values… (a pump totalizer photo goes on the Pump tab)". A sale meter or receipt on the Pump tab is flagged "This looks like a sale meter or receipt, not a pump totalizer". Anything else on the slip scan is refused ("This doesn't look like a shift closing slip").
+
+11. **"What about typos: negative, zero, letters, 1e9?"**
+    Refused with a clear message: amounts must be above zero, `1e9` isn't read as 1, and a single sale over 10,000 L or ₱1,000,000 is refused. In the cash check, negative or non-numeric cash, float or GCash is refused. A double-tap on a button is ignored.
+
+12. **"What if they press 'Start new shift' by mistake?"**
+    The old shift is closed and kept; its closing totalizer becomes the new shift's opening. The posted fuel prices carry over (this was a bug I fixed on Oct 9). **Weakness:** there's no "reopen shift" button.
+
+13. **"What if the app or laptop restarts mid-shift?"**
+    Everything is saved to SQLite as soon as it's entered; after a restart the same shift, sales and readings are there (tested by killing and restarting the server).
+
+14. **"What if the closing slip is scanned twice?"**
+    Items already recorded are matched and skipped, so confirming twice adds nothing.
+
+15. **"Same sale entered twice?"**
+    **Weakness:** two genuinely separate saves of the same values are two sales (a station can sell ₱500 of diesel twice in a minute). They show up in the Sales list to void, and the pump-vs-sales check would show more recorded than dispensed.

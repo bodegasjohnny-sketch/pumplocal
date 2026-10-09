@@ -414,6 +414,15 @@
     }).catch(function () { return { error: "Cannot reach the PumpLocal server. Is app.py still running?", _status: 0 }; });
   }
 
+  // Double-click guard (stress test Oct 9): a second click on the same button within 0.8 s is ignored, so a
+  // double-tap can't save an expense, credit sale or reading twice.
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest && e.target.closest("button"); if (!b) return;
+    var t = Date.now();
+    if (b._lastClick && t - b._lastClick < 800) { e.stopImmediatePropagation(); e.preventDefault(); return; }
+    b._lastClick = t;
+  }, true);
+
   // ---------- tabs
   document.querySelectorAll("nav button").forEach(function (b) {
     b.addEventListener("click", function () { showTab(b.dataset.tab); });
@@ -1068,7 +1077,8 @@
       state.pumpSource = j.ok ? "photo" : "manual";
       var html = readerLine(j);
       if (j.fallback_reason) html += '<div class="note warn">' + esc(j.fallback_reason) + "</div>";
-      if (j.ok) html += '<div class="note info">' + esc(j.message) + (j.pump_name ? " Label: <b>" + esc(j.pump_name) + "</b>." : "") +
+      if (j.ok && j.not_totalizer) html += '<div class="note err">⚠️ ' + esc(j.message) + "</div>";
+      else if (j.ok) html += '<div class="note info">' + esc(j.message) + (j.pump_name ? " Label: <b>" + esc(j.pump_name) + "</b>." : "") +
         (j.amount ? " Peso totalizer: <b>" + esc(j.amount) + "</b>." : "") + (j.volume ? " Liter totalizer: <b>" + esc(j.volume) + "</b>." : "") + "</div>";
       else html += '<div class="note err">⚠️ ' + esc(j.message || j.error) + "</div>";
       (j.notes || []).forEach(function (n) { html += '<div class="note warn">' + esc(n) + "</div>"; });
