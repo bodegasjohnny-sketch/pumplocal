@@ -26,6 +26,12 @@ TYPES = {".html": "text/html; charset=utf-8", ".png": "image/png", ".jpg": "imag
          ".jpeg": "image/jpeg", ".svg": "image/svg+xml"}
 
 
+def pump_payload(tolerance_pct=None):
+    check = core.pump_check(tolerance_pct=tolerance_pct)
+    return {"check": check, "pumps": core.list_pumps(), "tolerance_pct": check["tolerance_pct"],
+            "fuels": core.FUELS}
+
+
 def status_payload():
     return {"ai": ai.status(), "vision": vision.status(), "reader": core.READER, "sync": sync.status(),
             "station": core.STATION}
@@ -80,11 +86,15 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_file(os.path.join(SAMPLES, name))
         if path == "/api/samples":
             files = sorted(f for f in os.listdir(SAMPLES) if f.lower().endswith((".png", ".jpg")))
-            return self.send_json({"samples": files})
+            pump = [f for f in files if "totalizer" in f.lower()]
+            # "samples" = sale photos (Photo tab); "pump_samples" = totalizer photos (Pump tab)
+            return self.send_json({"samples": [f for f in files if f not in pump], "pump_samples": pump})
         if path == "/api/status":
             return self.send_json(status_payload())
         if path == "/api/shift":
             return self.send_json(core.shift_summary())
+        if path == "/api/pump":
+            return self.send_json(pump_payload())
         return self.send_json({"error": "not found"}, 404)
 
     def do_POST(self):
@@ -125,8 +135,42 @@ class Handler(BaseHTTPRequestHandler):
                 lang = "tl" if data.get("lang") == "tl" else "en"
                 text, source = ai.cash_explanation(result, lang)
                 saved = core.save_cash_check(result, text, source, s["shift"]["id"])
+                pump = s["pump_check"]  # pump meters vs sales, shown in the same summary (code + template)
                 return self.send_json({"result": result, "explanation": text, "explanation_source": source,
-                                       "record": saved, "sync": sync.status()})
+                                       "record": saved, "sync": sync.status(), "pump_check": pump,
+                                       "pump_text": ai.template_pump_text(pump, lang)})
+            if path == "/api/pump/extract":
+                img = data.get("image") or ""
+                if len(img) < 100:
+                    return self.send_json({"error": "No image received."}, 400)
+                try:
+                    return self.send_json(ai.read_totalizer(img, data.get("image_full") or None))
+                except ai.AIError as e:
+                    return self.send_json({
+                        "ok": False, "error": str(e), "reader": "gemma", "source": ai.model_label(), "reading": None,
+                        "message": "Local AI unavailable. You can still type the reading and save."}, 503)
+            if path == "/api/pump/save":
+                pump, errors = core.save_pump(data)
+                if errors:
+                    return self.send_json({"error": " ".join(errors)}, 400)
+                return self.send_json(dict(pump_payload(), pump=pump))
+            if path == "/api/pump/reading":
+                rec, errors, warnings = core.save_reading(data.get("pump_id"), data.get("kind"), data.get("reading"),
+                                                          data.get("source") or "manual")
+                if errors:
+                    return self.send_json({"error": " ".join(errors)}, 400)
+                return self.send_json(dict(pump_payload(), reading=rec, warnings=warnings))
+            if path == "/api/pump/settings":
+                tol = core.dec(data.get("tolerance_pct"))
+                if tol is None or tol < 0 or tol > 100:
+                    return self.send_json({"error": "Tolerance must be a percent between 0 and 100."}, 400)
+                core.set_setting("pump_tolerance_pct", str(tol))
+                return self.send_json(pump_payload())
+            if path == "/api/pump/check":
+                payload = pump_payload()
+                lang = "tl" if data.get("lang") == "tl" else "en"
+                text, source = ai.pump_explanation(payload["check"], lang)
+                return self.send_json(dict(payload, explanation=text, explanation_source=source))
             if path == "/api/ask":
                 q = (data.get("question") or "").strip()[:500]
                 if not q:
@@ -146,6 +190,8 @@ def main():
     core.init_db()
     if core.is_empty():
         seed.seed()
+    else:
+        seed.seed_pumps_if_demo()  # older demo databases get the Diesel 2 totalizer demo too
     sync.start_background()
     try:
         httpd = ThreadingHTTPServer((HOST, PORT), Handler)

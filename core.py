@@ -329,6 +329,7 @@ def shift_summary(shift_id=None):
         "shift": shift, "fuels": fuels, "count": len(sales),
         "total_amount": str(q2(total_amount)), "total_liters": str(q3(total_liters)),
         "sales": list(reversed(sales)), "last_cash_check": checks[0] if checks else None,
+        "pump_check": pump_check(shift["id"]),
     }
 
 

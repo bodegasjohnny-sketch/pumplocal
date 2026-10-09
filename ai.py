@@ -15,6 +15,7 @@ import urllib.request
 
 import core
 import meterparse
+import totalizer
 import vision
 
 EXTRACT_PROMPT = (
@@ -286,6 +287,144 @@ def read_photo(image, image_full=None):
     return res
 
 
+# ---------------------------------------------------------------- 1b) totalizer photo -> reading
+TOTALIZER_PROMPT = (
+    "This photo shows a fuel pump's totalizer (lifetime counter) screen. Reply with JSON only: "
+    '{"reading": "the large counter number exactly as shown, digits only", '
+    '"display_label": "the word next to the number, e.g. Volume or Money, or null", '
+    '"pump_label": "pump or fuel label such as DIESEL 2, or null"}. '
+    "Ignore menu numbers like 2. in a title. Use null if not clearly visible. Do not guess."
+)
+MOCK_TOTALIZER = ('Here is the totalizer:\n```json\n{"reading": "775397", "display_label": "Volume", '
+                  '"pump_label": "DIESEL 2"}\n```')
+
+
+def _totalizer_result(p, raw, seconds, reader, source):
+    ok = p["reading"] is not None
+    if ok:
+        msg = "Read from photo. Check the number, choose the pump and Opening/Closing, then save."
+    else:
+        msg = "Could not find the totalizer number in the photo. Please type it in."
+    return {"ok": ok, "reading": p["reading"], "pump_name": p["pump_name"], "fuel_type": p["fuel_type"],
+            "unit_hint": p["unit_hint"], "label": p["label"], "confidence": p["confidence"], "notes": p["notes"],
+            "raw": (raw or "")[:500], "message": msg, "seconds": round(seconds, 1), "reader": reader,
+            "source": source}
+
+
+def extract_totalizer(image_b64):
+    """Gemma reads the totalizer; the reply is still parsed and checked by totalizer.py (code)."""
+    if image_b64.startswith("data:") and "," in image_b64[:100]:
+        image_b64 = image_b64.split(",", 1)[1]
+    t0 = time.time()
+    if core.MOCK_AI:
+        raw = MOCK_TOTALIZER
+    else:
+        raw = chat([{"role": "user", "content": TOTALIZER_PROMPT, "images": [image_b64]}], json_mode=True,
+                   num_predict=80)
+    obj = parse_json_text(raw) or {}
+    lines = []
+    reading = obj.get("reading")
+    if reading not in (None, "", "null"):
+        label = obj.get("display_label")
+        label = label if label not in (None, "", "null") else "Total"
+        lines.append("%s %s" % (label, reading))
+    if obj.get("pump_label") not in (None, "", "null"):
+        lines.append(str(obj["pump_label"]))
+    p = totalizer.parse(lines)
+    return _totalizer_result(p, raw, time.time() - t0, "gemma", model_label())
+
+
+def read_totalizer(image, image_full=None):
+    """Totalizer photo -> reading. Same OCR-first pipeline as sales photos: Apple Vision + code first; Gemma only
+    if OCR is unavailable or finds no labelled number (READER=auto|vision|gemma)."""
+    reader = core.READER
+    fallback_reason, partial = None, None
+    if reader in ("auto", "vision"):
+        t0 = time.time()
+        try:
+            data, suffix = _decode_image(image_full or image)
+            lines = vision.run_image_bytes(data, suffix)
+            p = totalizer.parse(lines)
+            res = _totalizer_result(p, "\n".join(ln.get("text", "") for ln in lines), time.time() - t0,
+                                    "vision", VISION_SOURCE)
+            if (p["reading"] and p["confidence"] in ("labelled", "nearby")) or reader == "vision":
+                return res
+            partial = res
+            fallback_reason = ("Apple Vision read the photo in %.1fs but found no Volume/Total number, so Gemma read "
+                               "it instead." % (time.time() - t0))
+        except vision.OCRError as e:
+            if reader == "vision":
+                p = totalizer.parse([])
+                res = _totalizer_result(p, "", time.time() - t0, "vision", VISION_SOURCE)
+                res["message"] = "Apple Vision OCR could not read the photo (%s). Please type the reading." % e
+                return res
+            if vision.status()["available"]:
+                fallback_reason = "Apple Vision OCR failed (%s), so Gemma read it instead." % e
+        except (ValueError, TypeError) as e:
+            fallback_reason = "Could not decode the image for OCR (%s)." % e
+    try:
+        res = extract_totalizer(image)
+    except AIError:
+        if partial and partial["ok"]:
+            partial["notes"].append("Gemma fallback unavailable; this number is the OCR's best guess. Please check it.")
+            return partial
+        raise
+    if fallback_reason:
+        res["fallback_reason"] = fallback_reason
+    return res
+
+
+# ---------------------------------------------------------------- 1c) pump vs sales wording
+def template_pump_text(check, lang="en"):
+    """Short wording for the pump check. All numbers come from core.pump_check."""
+    groups = [g for g in (check or {}).get("groups", []) if g.get("status") != "INCOMPLETE"]
+    if not groups:
+        waiting = (check or {}).get("groups")
+        if waiting:
+            return " ".join(g["headline_tl" if lang == "tl" else "headline"] for g in waiting)
+        return ("Wala pang reading ng metro ng pump ngayong shift. Ilagay ang opening at closing sa Pump tab."
+                if lang == "tl" else
+                "No pump meter readings yet this shift. Record opening and closing readings on the Pump tab.")
+    out = []
+    for g in groups:
+        head = g["headline_tl" if lang == "tl" else "headline"]
+        tol = g.get("tolerance_pct")
+        if g["status"] == "UNACCOUNTED":
+            head += (" Lampas sa %s%% na palugit: tingnan kung may bentang hindi pa naitala (o utang), at basahin ulit "
+                     "ang metro." % tol if lang == "tl" else
+                     " Over the %s%% tolerance: look for sales not yet recorded (or credit fill-ups), then re-read the "
+                     "meter." % tol)
+        elif g["status"] == "OVER_RECORDED":
+            head += (" Lampas sa %s%% na palugit: tingnan kung may dobleng benta, at kung tama ang reading at decimals."
+                     % tol if lang == "tl" else
+                     " Over the %s%% tolerance: check for duplicate sales, and that the reading and decimals are "
+                     "right." % tol)
+        out.append(("%s: " % g["fuel_type"]) + head)
+    return " ".join(out)
+
+
+def pump_explanation(check, lang="en"):
+    """Returns (text, source). The local model only words the code-computed result; template if unavailable."""
+    if core.MOCK_AI:
+        return template_pump_text(check, lang), "template"
+    groups = [g for g in (check or {}).get("groups", []) if g.get("status") not in ("INCOMPLETE",)]
+    if not groups:
+        return template_pump_text(check, lang), "template"
+    language = "Tagalog" if lang == "tl" else "English"
+    facts = " ".join("%s: %s Status: %s (tolerance %s%%)." % (g["fuel_type"], g["headline"], g["status"],
+                                                               g["tolerance_pct"]) for g in groups)
+    prompt = ("Gas station pump meter (totalizer) check vs recorded sales, numbers computed by the system: %s\n"
+              "Write 1-2 short sentences in %s for the station owner: what this means and one practical next step. "
+              "Use only these numbers. Do not calculate anything new." % (facts, language))
+    try:
+        text = chat([{"role": "user", "content": prompt}], num_predict=100).strip()
+        if text:
+            return text, "ai"
+    except AIError:
+        pass
+    return template_pump_text(check, lang), "template-fallback"
+
+
 # ---------------------------------------------------------------- 2) cash check wording
 def template_cash_text(r, lang):
     diff = core.Decimal(r["diff"])
@@ -336,11 +475,74 @@ def summary_context(s):
             core.peso(c["expected"]), core.peso(c["declared"]), core.peso(c["diff"]), c["status"]))
     else:
         lines.append("No cash check yet this shift.")
+    p = s.get("pump_check")
+    if p and p.get("groups"):
+        lines.append("Pump meters (totalizer readings vs recorded sales; tolerance %s%%):" % p["tolerance_pct"])
+        for r in p["pumps"]:
+            if r["status"] == "NONE":
+                continue
+            unit = "pesos" if r["unit"] == "PHP" else "liters"
+            lines.append("- %s (%s, %s): opening %s, closing %s, dispensed %s." % (
+                r["name"], r["fuel_type"], unit, r["opening_value"] or "not recorded",
+                r["closing_value"] or "not recorded", r["dispensed_text"] or "n/a"))
+        for g in p["groups"]:
+            lines.append("- %s pump check: %s Status: %s." % (g["fuel_type"], g["headline"], g["status"]))
+    else:
+        lines.append("No pump meter readings yet this shift.")
     return "\n".join(lines)
+
+
+PUMP_WORDS = ("pump", "metro", "totalizer", "meter", "dispens", "nailabas", "lumabas")
+GAP_WORDS = ("kulang", "sobra", "short", "missing", "nawawala", "unaccounted", "gap", "naitala", "nawala", "leak")
+
+
+def _fuel_in(q):
+    for word, name in (("diesel", "Diesel"), ("krudo", "Diesel"), ("premium", "Premium"), ("unleaded", "Unleaded"),
+                       ("regular", "Unleaded"), ("gas", "Unleaded")):
+        if word in q:
+            return name
+    return None
+
+
+def pump_answer(question, s, lang):
+    """Answer pump-meter questions like 'May kulang ba sa diesel?' from code-computed data, or None."""
+    q = (question or "").lower()
+    if any(w in q for w in ("cash", "pera", "kaha", "drawer")):
+        return None
+    pumpy, gappy = any(w in q for w in PUMP_WORDS), any(w in q for w in GAP_WORDS)
+    fuel = _fuel_in(q)
+    if not (pumpy or (gappy and fuel)):
+        return None
+    groups = ((s.get("pump_check") or {}).get("groups")) or []
+    if fuel:
+        groups = [g for g in groups if g["fuel_type"] == fuel]
+    if not groups:
+        return ("Wala pang reading ng metro ng pump%s ngayong shift. Ilagay ang opening at closing sa Pump tab." % (
+            " para sa " + fuel if fuel else "") if lang == "tl" else
+            "No pump meter readings%s this shift yet. Record opening and closing readings on the Pump tab." % (
+                " for " + fuel if fuel else ""))
+    out = []
+    for g in groups:
+        head = g["headline_tl" if lang == "tl" else "headline"]
+        st = g["status"]
+        if st == "UNACCOUNTED":
+            out.append(("Oo. %s Lampas sa %s%% na palugit." if lang == "tl" else "Yes. %s Over the %s%% tolerance.")
+                       % (head, g["tolerance_pct"]))
+        elif st == "OVER_RECORDED":
+            out.append(("%s Lampas sa %s%% na palugit; tingnan kung may dobleng benta." if lang == "tl" else
+                        "%s Over the %s%% tolerance; check for duplicate sales.") % (head, g["tolerance_pct"]))
+        elif st == "OK":
+            out.append(("Wala. %s" if lang == "tl" else "No. %s") % head)
+        else:
+            out.append(head)
+    return " ".join(out)
 
 
 def template_answer(question, s, lang):
     q = (question or "").lower()
+    pa = pump_answer(question, s, lang)
+    if pa:
+        return pa
     if any(w in q for w in ("cash", "kulang", "sobra", "pera", "short", "over")):
         c = s.get("last_cash_check")
         if not c:
@@ -405,7 +607,8 @@ def ask(question, s):
         language = "Tagalog" if lang == "tl" else "English"
         prompt = ("You help staff at a small Philippine gas station. DATA (computed by the system, trust it):\n"
                   "%s\n\nQUESTION: %s\n\nAnswer in %s in 1-3 short sentences using ONLY numbers from DATA. "
-                  "Do not calculate new numbers. If DATA does not have the answer, say so." % (
+                  "Do not calculate new numbers. For questions about missing or unrecorded fuel (e.g. 'may kulang ba sa "
+                  "diesel?'), use the Pump meters lines. If DATA does not have the answer, say so." % (
                       context, question, language))
         try:
             answer, source = chat([{"role": "user", "content": prompt}], num_predict=150).strip(), "ai"

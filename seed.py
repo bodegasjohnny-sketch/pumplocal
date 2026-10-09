@@ -22,6 +22,36 @@ DEMO_SALES = [
 ]
 
 
+# Pump totalizer demo. OPENING 775397 is the reading on the REAL photo samples/real_totalizer_diesel2.png.
+# CLOSING 775578 is DEMO DATA (made up): with 0 decimals in liters the pump says 181 L of diesel left the pump,
+# while the seeded diesel sales add up to 174.216 L (P10,000 at P57.40/L), so 6.784 L (3.75%) is unaccounted.
+DEMO_PUMP = {"name": "Diesel 2", "fuel_type": "Diesel", "unit": "L", "decimals": 0}
+DEMO_OPENING, DEMO_CLOSING = "775397", "775578"
+
+
+def seed_pumps(shift_id, start):
+    pump, errors = core.save_pump(DEMO_PUMP)
+    assert not errors, errors
+    for minutes, kind, value in ((0, "open", DEMO_OPENING), (175, "close", DEMO_CLOSING)):
+        when = (start + timedelta(minutes=minutes)).strftime("%Y-%m-%d %H:%M:%S")
+        rec, errors, _ = core.save_reading(pump["id"], kind, value, "seed", shift_id=shift_id, created_at=when)
+        assert not errors, errors
+    return pump
+
+
+def seed_pumps_if_demo():
+    """Add the pump demo to a database seeded before this feature existed (only the untouched demo shift)."""
+    core.init_db()
+    if core.list_pumps():
+        return False
+    shift = core.rows("SELECT * FROM shifts WHERE status='open' ORDER BY id DESC LIMIT 1")
+    if not shift or shift[0]["attendant"] != "Demo Attendant":
+        return False
+    start = datetime.strptime(shift[0]["opened_at"], "%Y-%m-%d %H:%M:%S")
+    seed_pumps(shift[0]["id"], start)
+    return True
+
+
 def seed(reset=False):
     if reset and os.path.exists(core.DB_PATH):
         os.remove(core.DB_PATH)
@@ -37,9 +67,12 @@ def seed(reset=False):
         rec, errors, _ = core.save_sale({"fuel_type": fuel, "price_per_liter": DEMO_PRICES[fuel],
                                          "amount_pesos": amount, "source": "seed"}, shift_id=sid, created_at=when)
         assert not errors, errors
+    seed_pumps(sid, start)
     s = core.shift_summary(sid)
     print("Seeded demo shift #%d: %d sales, %s, %s L" % (sid, s["count"], core.peso(s["total_amount"]),
                                                         s["total_liters"]))
+    for g in s["pump_check"]["groups"]:
+        print("  Pump check (demo): %s" % g["headline"])
     return True
 
 
