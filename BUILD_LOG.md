@@ -81,6 +81,7 @@ Times are git commit times converted to PHT (UTC+8), from `git log`. Several com
 
 - **Made before kickoff:** the real photo of a pump totalizer screen at my station (`samples/real_totalizer_diesel2.png`). Only its peso reading (775397) is real; the other pump readings in the demo are made up. If I show a photo of a handwritten closing sheet on a slide, it was also taken before kickoff and is blurred. It is **not** in the repo; the slide falls back to a drawn placeholder.
 - **Generated during the hackathon:** all other sample images, which are synthetic: the meter and receipt samples, `samples/closing_sheet_*`, the closing slip (`samples/closing_slip_*`) and the two Diesel 2 closing totalizer screens (`samples/synthetic_totalizer_diesel2_close_*`, made-up closings that fit the real opening).
+- **Why real photos:** to make PumpLocal usable in real practice and not just a lab demo, I designed and tested it against real photos from my own station: the pump totalizer screen and my handwritten closing sheet. That way the formats, labels and pump counters match what staff actually see. (The totalizer photo above was taken before kickoff; the handwritten sheet photo is not in the repo.)
 - **Code:** none existed before kickoff.
 
 ## Privacy

@@ -143,6 +143,7 @@ If Ollama isn't running, the app still works. On a Mac, photos are still read by
 - **APIs:** none required. The optional sync endpoint (`SYNC_URL`) is the only network call.
 - **Existing code:** none. Everything was built during the hackathon. The real totalizer photo was taken before kickoff.
 - **AI dev tools:** Grok Bot (all code). Claude was used for Mac cleanup only. See above.
+- **Built against real station photos:** to make PumpLocal usable in real practice and not just a lab demo, it was designed and tested against real photos from Johnny's own station: the pump totalizer screen and his handwritten closing sheet. That way the formats, labels and pump counters match what staff actually see. The totalizer photo (`samples/real_totalizer_diesel2.png`) was taken before kickoff; the handwritten closing sheet is not in the repo.
 - **Sample images:** the sale photos, the closing slip and the two closing totalizer screens (`synthetic_totalizer_diesel2_close_*.png`, made-up closings consistent with the real opening) are synthetic, computer-generated (not photos of real pumps or receipts). `samples/real_totalizer_diesel2.png` is a **real photo** of a pump totalizer screen at the team's own station, a real asset. Only its peso reading (775397) is real; the other seeded pump readings, discounts, credit sales and expenses are demo data.
 - **Demo prices:** the seeded prices (Premium ₱64.99, Unleaded ₱61.25, Diesel ₱57.40) are demo values, not live pump prices.
 
