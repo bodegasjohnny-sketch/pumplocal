@@ -780,6 +780,9 @@ def save_reading(pump_id, kind, amount=None, volume=None, source="manual", shift
                 d = dispensed(o, c, pump["%s_decimals" % name])
                 if d["error"]:
                     warnings.append(("Peso" if name == "amount" else "Liter") + " totalizer: " + d["error"])
+                elif d["value"] > PLAUSIBLE_MAX[name]:
+                    warnings.append("This reading looks wrong for %s, did you mean %s? Tap Move on the pump card." % (
+                        "liters" if name == "volume" else "pesos", "pesos" if name == "volume" else "liters"))
     return rec, [], warnings
 
 
@@ -832,6 +835,105 @@ def _save_reading_auto(pump_id, amount, volume, source, shift_id, created_at):
     return rec, [], warnings
 
 
+# A shift never dispenses more than this per pump; a bigger difference means the reading is in the wrong box
+# (Oct 9 Mac test: closing pesos 2595535 saved as liters -> "2,563,201.27 L dispensed").
+PLAUSIBLE_MAX = {"volume": Decimal("5000"), "amount": Decimal("500000")}
+
+
+def _plausible(counter, opening, closing, decimals=0):
+    o, c = reading_value(opening, decimals), reading_value(closing, decimals)
+    if o is None or c is None:
+        return None
+    return Decimal(0) <= c - o <= PLAUSIBLE_MAX[counter]
+
+
+def liters_have_decimals(pump_id):
+    """True if this pump's liter counter shows decimals: set for Premium 3 by seed.py, or learned from any saved
+    liter reading with a decimal point."""
+    if get_setting("liters_decimals:%s" % pump_id) == "1":
+        return True
+    return bool(rows("SELECT 1 FROM totalizer_readings WHERE pump_id=? AND volume LIKE '%.%' LIMIT 1", (pump_id,)))
+
+
+def classify_reading(pump_id, kind, value, hint=None, strong=False, shift_id=None):
+    """Peso or liter box for a photo reading, by plausibility against the pump's other reading on each side, then the
+    photo's own signals. Returns {"counter": 'amount'|'volume'|None, "ask": bool, "message", "checks"}.
+    counter None + ask: show 'Is this pesos or liters?' instead of guessing."""
+    kind = {"opening": "open", "closing": "close"}.get(kind, kind)
+    v = clean_reading(value)
+    try:
+        pump = rows("SELECT * FROM pumps WHERE id=?", (int(pump_id),))[0]
+    except (TypeError, ValueError, IndexError):
+        pump = None
+    if v is None or pump is None or kind not in ("open", "close"):
+        return {"counter": hint if strong else None, "ask": not strong, "checks": {},
+                "message": "Is this pesos or liters? · Piso ba ito o litro?"}
+    if not strong:  # this pump's liter counter shows 2 decimals (Premium 3: 32749.80): whole numbers are pesos
+        if re.fullmatch(r"\d+\.\d{2}", v):
+            hint, strong = "volume", True
+        elif "." not in v and liters_have_decimals(pump["id"]):
+            hint, strong = "amount", True
+    shift_id = shift_id or current_shift()["id"]
+    other = "open" if kind == "close" else "close"
+    ref = (rows("SELECT * FROM totalizer_readings WHERE shift_id=? AND pump_id=? AND kind=?",
+                (shift_id, pump["id"], other)) or [{}])[0]
+    checks = {}
+    for c in COUNTERS:
+        r = ref.get(c)
+        if not r:
+            checks[c] = "unknown"
+        else:
+            o, cl = (r, v) if kind == "close" else (v, r)
+            checks[c] = "ok" if _plausible(c, o, cl, pump["%s_decimals" % c]) else "bad"
+    word = {"amount": "pesos", "volume": "liters"}
+    ok = [c for c in COUNTERS if checks[c] == "ok"]
+    bad = [c for c in COUNTERS if checks[c] == "bad"]
+    unknown = [c for c in COUNTERS if checks[c] == "unknown"]
+    pick, why = None, ""
+    if len(ok) == 1 and len(bad) == 1:
+        pick, why = ok[0], "only %s fits the %s" % (word[ok[0]], "opening" if kind == "close" else "closing")
+    elif len(ok) == 1 and unknown:
+        pick = hint if (strong and hint in unknown) else ok[0]
+        why = "the photo says %s" % word[pick] if pick != ok[0] else "%s fits the other reading" % word[pick]
+    elif len(bad) == 1 and unknown:
+        if strong and hint == bad[0]:
+            return {"counter": None, "ask": True, "checks": checks,
+                    "message": "This reading looks wrong for %s. Is this pesos or liters?" % word[hint]}
+        pick, why = unknown[0], "it does not fit as %s" % word[bad[0]]
+    elif strong and hint in COUNTERS and checks[hint] != "bad":
+        pick, why = hint, "the photo says %s" % word[hint]
+    if pick:
+        return {"counter": pick, "ask": False, "checks": checks,
+                "message": "Saved as %s: %s." % (word[pick], why)}
+    msg = ("This number does not fit the %s readings for pesos or liters. Is this pesos or liters?" %
+           ("opening" if kind == "close" else "closing")) if len(bad) == 2 else "Is this pesos or liters? · Piso ba ito o litro?"
+    return {"counter": None, "ask": True, "checks": checks, "message": msg}
+
+
+def move_reading(pump_id, counter, kind="close", shift_id=None):
+    """One tap: move this side's reading from the peso box to the liter box (or back). Returns errors."""
+    if counter not in COUNTERS:
+        return ["Choose the peso or the liter totalizer."]
+    kind = {"opening": "open", "closing": "close"}.get(kind, kind)
+    try:
+        pump_id = int(pump_id)
+    except (TypeError, ValueError):
+        return ["Choose a pump."]
+    shift_id = shift_id or current_shift()["id"]
+    to = "volume" if counter == "amount" else "amount"
+    r = rows("SELECT * FROM totalizer_readings WHERE shift_id=? AND pump_id=? AND kind=?", (shift_id, pump_id, kind))
+    if not r or not r[0][counter]:
+        return ["Nothing to move."]
+    if r[0][to]:
+        return ["The %s box already has %s. Fix it on the pump card." % ("liter" if to == "volume" else "peso", r[0][to])]
+    with _db_lock, connect() as conn:
+        conn.execute("UPDATE totalizer_readings SET %s=?, %s_source=?, %s=NULL, %s_source=NULL, synced=0 WHERE "
+                     "shift_id=? AND pump_id=? AND kind=?" % (to, to, counter, counter),
+                     (r[0][counter], r[0][counter + "_source"], shift_id, pump_id, kind))
+        conn.commit()
+    return []
+
+
 def swap_reading(pump_id, counter, shift_id=None):
     """Staff tapped Swap: exchange this counter's opening and closing (values and sources). Returns errors."""
     if counter not in COUNTERS:
@@ -856,7 +958,7 @@ def swap_reading(pump_id, counter, shift_id=None):
 
 def _pump_row(p, o, c):
     row = dict(p)
-    row["error"], row["errors"], row["swap"] = None, [], []
+    row["error"], row["errors"], row["swap"], row["move"] = None, [], [], []
     statuses = []
     for name in COUNTERS:
         unit, decs = COUNTER_UNIT[name], p["%s_decimals" % name]
@@ -880,6 +982,14 @@ def _pump_row(p, o, c):
                 msg = ("Peso" if name == "amount" else "Liter") + " totalizer: " + d["error"]
                 row["errors"].append(msg)
                 row["error"] = row["error"] or msg
+            elif d["value"] > PLAUSIBLE_MAX[name]:
+                st = "ERROR"
+                shown = fmt_qty(_q_unit(d["value"], unit), unit)
+                msg = ("This reading looks wrong for %s (%s in one shift), did you mean %s? Tap Move." % (
+                    "liters" if name == "volume" else "pesos", shown, "pesos" if name == "volume" else "liters"))
+                row["errors"].append(msg)
+                row["error"] = row["error"] or msg
+                row["move"].append(name)
             else:
                 st = "OK"
                 v = _q_unit(d["value"], unit)

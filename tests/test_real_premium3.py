@@ -214,6 +214,9 @@ class Premium3DemoTests(unittest.TestCase):
             code, x = call(self.b, "/api/pump/extract", {"image": img, "image_full": img})
             other = "volume" if counter == "amount" else "amount"
             self.assertEqual((x[counter], x[other], x["pump_name"]), (want, None, "Premium 3"))
+            code, c = call(self.b, "/api/pump/classify", {"pump_id": p3["id"], "kind": kind, "value": want,
+                                                          "hint": None, "strong": False})  # as if the title were lost
+            self.assertEqual((code, c["counter"]), (200, counter), (photo, c))
             code, j = call(self.b, "/api/pump/reading", {"pump_id": p3["id"], "kind": kind, "source": "photo",
                                                           counter: x[counter], other: x[other] or ""})
             self.assertEqual((code, j["warnings"]), (200, []), j)
@@ -230,6 +233,20 @@ class Premium3DemoTests(unittest.TestCase):
                 img = "data:image/png;base64," + base64.b64encode(f.read()).decode()
             code, j = call(self.b, "/api/pump/extract", {"image": img, "image_full": img})
             self.assertEqual((code, j["reader"], j[counter], j["pump_name"]), (200, "vision", want, "Premium 3"), photo)
+
+    def test_zz_api_bad_liters_then_move(self):
+        """Johnny's Mac bug through the API: closing pesos landed in Closing L -> flagged ERROR, one tap moves it."""
+        code, j = call(self.b, "/api/pump/save", {"name": "Premium 10", "fuel_type": "Premium"})
+        pid = [p for p in j["pumps"] if p["name"] == "Premium 10"][0]["id"]
+        call(self.b, "/api/pump/reading", {"pump_id": pid, "kind": "open", "amount": "2559778", "volume": "32333.73", "source": "photo"})
+        code, c = call(self.b, "/api/pump/classify", {"pump_id": pid, "kind": "close", "value": "2595535", "hint": "volume", "strong": False})
+        self.assertEqual(c["counter"], "amount")
+        code, j = call(self.b, "/api/pump/reading", {"pump_id": pid, "kind": "close", "volume": "2595535", "source": "photo"})
+        p = [x for x in j["check"]["pumps"] if x["id"] == pid][0]
+        self.assertEqual((p["status"], p["move"]), ("ERROR", ["volume"]))
+        code, j = call(self.b, "/api/pump/move", {"pump_id": pid, "counter": "volume", "kind": "close"})
+        p = [x for x in j["check"]["pumps"] if x["id"] == pid][0]
+        self.assertEqual((code, p["move"], p["closing_amount"], p["dispensed_amount_text"]), (200, [], "2595535", "₱35,757.00"))
 
     def test_z_api_reverse_order_then_swap(self):
         code, j = call(self.b, "/api/pump/save", {"name": "Premium 9", "fuel_type": "Premium"})
@@ -257,3 +274,154 @@ class Premium3DemoTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def vision_variants(fixture):
+    """What Apple Vision may return for a real Premium 3 photo: as recorded, the menu title missing, or garbled."""
+    base = lines(fixture)
+    title = [ln for ln in base if ln["text"][:2] in ("1.", "2.", "3.")]
+    rest = [ln for ln in base if ln not in title]
+    garbled = []
+    for ln in title:
+        t = ln["text"].replace("Money All", "Mon3y A11").replace("Report Oi!", "Rep0rt 0i!").replace("Report Oil", "Rep0rt 0il")
+        garbled.append(dict(ln, text=t[2:] if t[0] == "2" else t))  # "2." menu number dropped too
+    return {"recorded": base, "no title": rest, "garbled title": garbled + rest}
+
+
+class VisionTitleMissingTests(unittest.TestCase):
+    """Oct 9, 6:28 PM Mac test: Vision lost "2.Money All" on the closing pesos photo, so "Volume 2595535" went to
+    Closing L (2,563,201.27 L "dispensed"). Readings are now routed by plausibility against the pump's other
+    reading, plus the photo's signals (fuzzy title, 'lite', two decimals; whole numbers are pesos on this pump)."""
+
+    def setUp(self):
+        self.old = core.DB_PATH
+        core.DB_PATH = os.path.join(tempfile.mkdtemp(), "t.db")
+        core.init_db()
+        core.new_shift()
+        self.pid = core.save_pump({"name": "Premium 3", "fuel_type": "Premium"})[0]["id"]
+        core.set_setting("liters_decimals:%s" % self.pid, "1")  # as seed.py --demo-empty
+
+    def tearDown(self):
+        core.DB_PATH = self.old
+
+    def upload(self, photo, variant):
+        fixture, counter, want, kind = REAL[photo]
+        p = totalizer.parse(vision_variants(fixture)[variant])
+        value = p["amount"] or p["volume"] or p["unassigned"]
+        self.assertEqual(value, want, (photo, variant))
+        r = core.classify_reading(self.pid, kind, value, p["counter_hint"], p["counter_strong"])
+        self.assertEqual((r["counter"], r["ask"]), (counter, False), (photo, variant, r))
+        rec, errors, warnings = core.save_reading(self.pid, kind, source="photo", **{r["counter"]: value})
+        self.assertEqual((errors, warnings), ([], []), (photo, variant))
+
+    def test_every_order_and_variant_lands_in_the_right_box(self):
+        for variant in ("recorded", "no title", "garbled title"):
+            for order in itertools.permutations(ORDER):
+                self.setUp()
+                for photo in order:
+                    self.upload(photo, variant)
+                r = [p for p in core.pump_check()["pumps"] if p["id"] == self.pid][0]
+                self.assertEqual((r["opening_amount"], r["closing_amount"], r["opening_volume"], r["closing_volume"],
+                                  r["dispensed_volume_text"], r["dispensed_amount_text"]),
+                                 ("2559778", "2595535", "32333.73", "32749.80", "416.07 L", "₱35,757.00"), (variant, order))
+                self.tearDown()
+
+    def test_johnnys_bug_closing_pesos_without_title(self):
+        core.save_reading(self.pid, "open", "2559778", "32333.73", "photo")
+        p = totalizer.parse([L("Volume 2595535", 0.2, 0.33), L("Cancel", 0.26, 0.46), L("PREMIUM 3", 0.1, 0.69)])
+        self.assertEqual((p["volume"], p["counter_strong"]), ("2595535", False))  # the parser alone says liters
+        r = core.classify_reading(self.pid, "close", "2595535", p["counter_hint"], p["counter_strong"])
+        self.assertEqual(r["counter"], "amount")
+        # even with no pump knowledge, plausibility alone decides: only pesos fits the opening
+        core.set_setting("liters_decimals:%s" % self.pid, "0")
+        r = core.classify_reading(self.pid, "close", "2595535", "volume", False)
+        self.assertEqual((r["counter"], r["checks"]), ("amount", {"amount": "ok", "volume": "bad"}))
+
+    def test_ambiguous_asks_instead_of_guessing(self):
+        core.set_setting("liters_decimals:%s" % self.pid, "0")
+        r = core.classify_reading(self.pid, "open", "2559778", "volume", False)  # nothing to compare with
+        self.assertEqual((r["counter"], r["ask"]), (None, True))
+        self.assertIn("Is this pesos or liters?", r["message"])
+
+    def test_implausible_saved_reading_is_flagged_with_move(self):
+        core.save_reading(self.pid, "open", "2559778", "32333.73", "photo")
+        rec, errors, warnings = core.save_reading(self.pid, "close", volume="2595535", source="manual")
+        self.assertIn("looks wrong for liters, did you mean pesos?", warnings[0])
+        r = [p for p in core.pump_check()["pumps"] if p["id"] == self.pid][0]
+        self.assertEqual((r["status"], r["dispensed_volume"], r["move"]), ("ERROR", None, ["volume"]))
+        self.assertIn("2,563,201.27 L in one shift", r["error"])
+        self.assertEqual(core.move_reading(self.pid, "volume"), [])
+        r = [p for p in core.pump_check()["pumps"] if p["id"] == self.pid][0]
+        self.assertEqual((r["closing_amount"], r["closing_volume"], r["dispensed_amount_text"], r["move"]),
+                         ("2595535", None, "₱35,757.00", []))
+
+    def test_pump_card_manual_fallback(self):
+        # the pump card fields are plain inputs saved with explicit kinds (the 💾 Save button)
+        core.save_reading(self.pid, "open", "2559778", "32333.73", "manual")
+        core.save_reading(self.pid, "close", "2595535", "32749.80", "manual")
+        r = [p for p in core.pump_check()["pumps"] if p["id"] == self.pid][0]
+        self.assertEqual((r["status"], r["dispensed_volume_text"]), ("OK", "416.07 L"))
+
+
+MAC = {  # REAL Apple Vision line text from Johnny's Mac (Oct 9 6:31 PM): title, 'Volume', value, panel labels
+    "opening_shift_pesos": ("amount", "2559778", "open"), "opening_shift_liters": ("volume", "32333.73", "open"),
+    "closing_shift_pesos": ("amount", "2595535", "close"), "closing_shift_liters": ("volume", "32749.80", "close")}
+
+
+def mac_layouts(name):
+    with open(os.path.join(ROOT, "tests", "ocr_fixtures", "vision_mac_premium3_%s.json" % name)) as f:
+        base = json.load(f)["lines"]
+    texts = [ln["text"] for ln in base]
+    same = [dict(ln) for ln in base if ln["text"] != "Volume"]
+    same[1]["text"] = "Volume " + same[1]["text"]
+    by = {ln["text"]: ln for ln in base}
+    beside = [dict(ln) for ln in base]  # panel labels on the same row as the value, left of the screen
+    for ln in beside:
+        if ln["text"] in ("Amoun", "Quantity"):
+            ln.update(x=0.02, y=by[texts[2]]["y"] + (0.0 if ln["text"] == "Quantity" else 0.04))
+    return {"next line (as on the Mac)": base, "same line": same, "panel labels beside value": beside,
+            "text only": texts}
+
+
+class MacVisionTests(unittest.TestCase):
+    """The exact text Vision gave on Johnny's Mac for the closing pesos photo routed 2595535 to liters. The menu
+    title ('2.Money All' pesos, '1.Report Oil' liters) wins over 'Volume'; 'Amoun'/'Quantity'/'8k' are ignored."""
+
+    def test_each_layout_lands_in_the_right_box(self):
+        for name, (counter, want, _) in MAC.items():
+            for layout, ls in mac_layouts(name).items():
+                p = totalizer.parse(ls)
+                other = "volume" if counter == "amount" else "amount"
+                self.assertEqual((p[counter], p[other], p["unassigned"], p["counter_hint"], p["counter_strong"]),
+                                 (want, None, None, counter, True), (name, layout, p))
+
+    def test_any_order_with_plausibility(self):
+        for order in itertools.permutations(MAC):
+            core_db = os.path.join(tempfile.mkdtemp(), "t.db")
+            old, core.DB_PATH = core.DB_PATH, core_db
+            try:
+                core.init_db(); core.new_shift()
+                pid = core.save_pump({"name": "Premium 3", "fuel_type": "Premium"})[0]["id"]
+                for name in order:
+                    counter, want, kind = MAC[name]
+                    p = totalizer.parse(mac_layouts(name)["next line (as on the Mac)"])
+                    r = core.classify_reading(pid, kind, p["reading"], p["counter_hint"], p["counter_strong"])
+                    self.assertEqual(r["counter"], counter, (order, name, r))
+                    self.assertEqual(core.save_reading(pid, kind, source="photo", **{counter: want})[1:], ([], []))
+                r = [x for x in core.pump_check()["pumps"] if x["id"] == pid][0]
+                self.assertEqual((r["dispensed_volume_text"], r["dispensed_amount_text"]), ("416.07 L", "₱35,757.00"))
+            finally:
+                core.DB_PATH = old
+
+    def test_plausibility_overrides_a_wrong_title(self):
+        # even if a screen said liters, 2595535 after an opening of 32333.73 L cannot be liters
+        core_db = os.path.join(tempfile.mkdtemp(), "t.db")
+        old, core.DB_PATH = core.DB_PATH, core_db
+        try:
+            core.init_db(); core.new_shift()
+            pid = core.save_pump({"name": "Premium 3", "fuel_type": "Premium"})[0]["id"]
+            core.save_reading(pid, "open", "2559778", "32333.73", "photo")
+            r = core.classify_reading(pid, "close", "2595535", "volume", True)
+            self.assertEqual((r["counter"], r["message"]), ("amount", "Saved as pesos: only pesos fits the opening."))
+        finally:
+            core.DB_PATH = old

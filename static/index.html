@@ -268,9 +268,9 @@
         </div>
         <div class="row2">
           <div><label class="f" for="pumpAmount">Peso totalizer ₱ <span class="tl">· Money</span></label>
-            <input class="num" id="pumpAmount" inputmode="decimal" placeholder="775397"></div>
+            <input class="num" id="pumpAmount" inputmode="decimal" placeholder="pesos · piso"></div>
           <div><label class="f" for="pumpVolume">Liter totalizer L <span class="tl">· Volume</span></label>
-            <input class="num" id="pumpVolume" inputmode="decimal" placeholder="13508"></div>
+            <input class="num" id="pumpVolume" inputmode="decimal" placeholder="liters · litro"></div>
         </div>
         <div class="calc" id="pumpReadCalc"></div>
         <button class="btn green" id="pumpReadSave">💾 Save reading · I-save</button>
@@ -278,7 +278,7 @@
     </div>
     <div class="card">
       <h2>Pumps <span class="tl">· Mga pump at nozzle</span></h2>
-      <p class="hint">Readings are whole numbers as displayed. Only if a pump hides decimal places, set them per counter (775397 with 2 = 7,753.97).</p>
+      <p class="hint">Readings are whole numbers as displayed. Only if a pump hides decimal places, set them per counter (1234567 with 2 = 12,345.67).</p>
       <div id="pumpList"></div>
       <details id="addPumpBox"><summary>＋ Add a pump · Magdagdag</summary>
         <div class="row2" style="margin-top:8px">
@@ -910,7 +910,7 @@
     var html = "<table><tr><th></th><th>Opening</th><th>Closing</th><th>Dispensed</th></tr>" +
       "<tr><td>₱ peso</td><td>" + cell(p.opening_amount) + "</td><td>" + cell(p.closing_amount) + "</td><td>" + cell(p.dispensed_amount_text) + "</td></tr>" +
       "<tr><td>L liter</td><td>" + cell(p.opening_volume) + "</td><td>" + cell(p.closing_volume) + "</td><td>" + cell(p.dispensed_volume_text) + "</td></tr></table>";
-    if (p.errors && p.errors.length) html += '<div class="note err">⚠️ ' + esc(p.errors.join(" ")) + " Use ⇄ Swap on the Premium 3 pump card below.</div>";
+    if (p.errors && p.errors.length) html += '<div class="note err">⚠️ ' + esc(p.errors.join(" ")) + " Fix it with the ⇄ button on the Premium 3 pump card below (or type the numbers there and Save).</div>";
     else if (g && g.status !== "INCOMPLETE") {
       html += '<div class="note ' + (g.flag ? "err" : "ok") + '" id="realVerdict">' + (g.flag ? "🔴 " : "✅ ") + esc(g.headline) + "</div>";
       if (g.price) html += '<div class="note ' + (g.price.ok ? "ok" : "warn") + '">' + (g.price.ok ? "✅ " : "⚠️ ") + esc(g.price.text) +
@@ -944,6 +944,11 @@
         "<h3>" + esc(p.name) + ' <span class="chip ' + fuelClass(p.fuel_type) + '">' + esc(p.fuel_type) + "</span></h3>" +
         '<div class="row4">' + inp(p, "opening", "amount") + inp(p, "closing", "amount") + inp(p, "opening", "volume") + inp(p, "closing", "volume") + "</div>" +
         '<div class="disp">' + line + "</div>" +
+        (p.move || []).map(function (c) {
+          return '<div class="note err">⚠️ This reading looks wrong for ' + (c === "volume" ? "liters" : "pesos") + ", did you mean " +
+            (c === "volume" ? "pesos" : "liters") + '?<br><button class="btn small" data-move="' + p.id + '" data-counter="' + c + '">⇄ Move closing ' +
+            (c === "volume" ? "L → ₱" : "₱ → L") + "</button></div>";
+        }).join("") +
         (p.swap || []).map(function (c) {
           return '<div class="note warn">⇅ ' + (c === "amount" ? "Peso" : "Liter") + " totalizer: Opening is higher than closing. Swap them? " +
             "(Could also mean the counter rolled over or was reset.)<br><span class=\"tl\">Mas mataas ang opening kaysa closing. Pagpalitin? " +
@@ -973,6 +978,28 @@
     if (!sel.value && sel.options.length) sel.selectedIndex = 0;
     autoKind();
   }
+  // Pesos or liters? Not from the title alone (Oct 9 Mac test: Vision dropped "2.Money All" and 2595535 went to
+  // liters). The server checks which box the number fits against this pump's other reading, plus the photo's signals.
+  function routeCounter(j) {
+    if ($("pumpRoute")) $("pumpRoute").innerHTML = "";
+    var v = j.amount || j.volume || j.unassigned, pid = $("pumpSel").value;
+    if (!v || !pid || pid === "new") return;
+    var put = function (c) {
+      $("pumpAmount").value = c === "amount" ? v : ""; $("pumpVolume").value = c === "volume" ? v : "";
+      state.detectedCounter = c; if (!state.kindManual) autoKind(); else pumpReadCalc();
+    };
+    api("/api/pump/classify", { pump_id: Number(pid), kind: state.kind, value: v, hint: j.counter_hint, strong: !!j.counter_strong })
+      .then(function (r) {
+        var box = $("pumpRoute"); if (!box) { box = document.createElement("div"); box.id = "pumpRoute"; $("pumpReadForm").insertBefore(box, $("pumpReadForm").firstChild); }
+        if (r.error) { box.innerHTML = ""; return; }
+        if (r.counter) { put(r.counter); box.innerHTML = '<div class="note info">' + esc(r.message) + "</div>"; return; }
+        $("pumpAmount").value = ""; $("pumpVolume").value = "";
+        box.innerHTML = '<div class="note warn" id="pumpAsk"><b>' + esc(r.message) + "</b> <b>" + esc(v) + "</b><br>" +
+          '<button class="btn small" data-route="amount">₱ Pesos · Piso</button> <button class="btn small" data-route="volume">L Liters · Litro</button></div>';
+        box.querySelectorAll("[data-route]").forEach(function (b) { b.addEventListener("click", function () {
+          put(b.dataset.route); box.innerHTML = '<div class="note info">Saved as ' + (b.dataset.route === "amount" ? "pesos" : "liters") + " (your choice).</div>"; }); });
+      });
+  }
   function setKind(k) { state.kind = k; document.querySelectorAll("#kindSeg button").forEach(function (b) { b.classList.toggle("on", b.dataset.k === k); }); pumpReadCalc(); }
   document.querySelectorAll("#kindSeg button").forEach(function (b) { b.addEventListener("click", function () { state.sampleKind = null; state.kindManual = true; setKind(b.dataset.k); }); });
   function selectedPump() { var id = $("pumpSel").value; return (state.pump && state.pump.check.pumps.filter(function (p) { return String(p.id) === id; })[0]) || null; }
@@ -993,7 +1020,7 @@
     [["pumpAmount", "amount", "₱", "peso"], ["pumpVolume", "volume", "L", "liter"]].forEach(function (x) {
       var v = $(x[0]).value.replace(/[\s,₱]/g, "");
       if (!v) return;
-      if (!/^\d+(\.\d+)?$/.test(v)) { warn += '<div class="note err">The ' + x[3] + " totalizer must be digits only, e.g. 775397.</div>"; return; }
+      if (!/^\d+(\.\d+)?$/.test(v)) { warn += '<div class="note err">The ' + x[3] + " totalizer must be digits only, e.g. 2595535.</div>"; return; }
       var d = p ? p[x[1] + "_decimals"] : 0, val = v.indexOf(".") >= 0 || !d ? v : (Number(v) / Math.pow(10, d)).toFixed(d);
       parts.push(x[3] + " " + esc(v) + (val !== v ? " = " + esc(val) : "") + " " + x[2]);
       var other = p && (state.kind === "close" ? p["opening_" + x[1] + "_value"] : p["closing_" + x[1] + "_value"]);
@@ -1037,6 +1064,7 @@
         $("pumpSel").value = state.force.pump; state.kindManual = true; setKind(state.force.kind);
         state.detected = null;
       }
+      routeCounter(j);
       state.pumpSource = j.ok ? "photo" : "manual";
       var html = readerLine(j);
       if (j.fallback_reason) html += '<div class="note warn">' + esc(j.fallback_reason) + "</div>";
@@ -1080,6 +1108,12 @@
   $("pumpList").addEventListener("click", function (e) {
     var side = e.target.dataset && e.target.dataset.side;
     if (side) { readSide(Number(e.target.dataset.pid), side, null); return; }
+    var mv = e.target.dataset && e.target.dataset.move;
+    if (mv) {
+      api("/api/pump/move", { pump_id: Number(mv), counter: e.target.dataset.counter, kind: "close" }).then(function (j) {
+        afterPumpSave(j, "Moved ✓ · Inilipat"); });
+      return;
+    }
     var sw = e.target.dataset && e.target.dataset.swap;
     if (sw) {
       api("/api/pump/swap", { pump_id: Number(sw), counter: e.target.dataset.counter }).then(function (j) {

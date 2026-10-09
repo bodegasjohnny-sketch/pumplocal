@@ -132,6 +132,7 @@ def seed_demo_empty():
         core.set_setting("price:%s" % fuel, price)
     pump, errors = core.save_pump(REAL_PUMP)
     assert not errors, errors
+    core.set_setting("liters_decimals:%s" % pump["id"], "1")  # its liter screen shows 32749.80; whole numbers = pesos
     for minutes, liters in DEMO_LOGBOOK:
         rec, errors, _ = core.save_sale({"fuel_type": "Premium", "liters": liters, "price_per_liter": DEMO_PRICES["Premium"],
                                          "source": "seed", "note": SAMPLE_SALES_NOTE}, shift_id=sid,

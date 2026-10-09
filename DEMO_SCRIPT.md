@@ -124,6 +124,7 @@ the Pump tab open. On stage you show the real Premium 3 photos, the slip and one
 | 2:45–3:00 | Close | "All math is code, the AI only reads and explains. ₱0 monthly cloud." |
 
 **If something goes wrong on stage:** a read that looks off → type the number (the form is always editable); a reading
-landed in the wrong box → tap ⇄ Swap; picked the wrong file → upload the right one with the same button (it
+landed in the wrong box → tap ⇄ Swap (opening/closing) or ⇄ Move (pesos/liters); the app asks "Is this pesos or
+liters?" → tap ₱ Pesos or L Liters; to see what the camera read → open "OCR text" under the result; picked the wrong file → upload the right one with the same button (it
 replaces that side); the Ask answer is slow → the Pump tab already shows the gap; no Ollama → photos
 still read with Apple Vision.

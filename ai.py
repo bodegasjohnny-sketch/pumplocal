@@ -325,6 +325,8 @@ def _totalizer_result(p, raw, seconds, reader, source):
     return {"ok": ok, "reading": p["reading"], "amount": p["amount"], "volume": p["volume"],
             "unassigned": p["unassigned"], "screen": p["screen"], "pump_name": p["pump_name"],
             "fuel_type": p["fuel_type"], "confidence": p["confidence"], "notes": p["notes"],
+            "counter_hint": p.get("counter_hint"), "counter_strong": p.get("counter_strong"),
+            "counter_why": p.get("counter_why"),
             "raw": (raw or "")[:500], "message": msg, "seconds": round(seconds, 1), "reader": reader,
             "source": source}
 

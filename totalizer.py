@@ -37,6 +37,8 @@ PESO_WORDS = re.compile(r"^(MONEY|AMOUNT|AMT|PESO|PHP|SALE|BANK)", re.I)
 FUEL_LABEL = re.compile(
     r"\b(DIESEL|PREMIUM|UNLEADED|SUPER|REGULAR|GASOLINE|KEROSENE|DSL)\b(?:\s*[-#]?\s*(?:N[O0]\.?\s*)?(\d{1,2})\b)?", re.I)
 PUMP_LABEL = re.compile(r"\b(PUMP|NOZZLE|NOZ|DISPENSER|ISLAND)\s*[-#:]?\s*(?:N[O0]\.?\s*)?(\d{1,2})\b", re.I)
+PANEL_LABEL = re.compile(r"^(AM[O0]UN\w*|QUANT\w*|QTY|PRICE|UNIT PRICE)\.?$", re.I)
+STICKER = re.compile(r"^\d{1,3}\s*[A-Za-z]{1,2}$")
 MENU_NUMBER = re.compile(r"(?<![\d.,])\b\d{1,2}\s*[.)]\s*(?=[A-Za-z])")
 
 
@@ -114,6 +116,9 @@ def _unit_of(label_words):
 def parse(lines):
     lines = [ln for ln in (lines or []) if _text(ln).strip()]
     name, fuel = pump_label(lines)
+    # Printed panel labels beside the LCD ("Amoun", "Quantity") are on every photo of the pump: never labels.
+    # Stickers like "8k" are not readings.
+    lines = [ln for ln in lines if not PANEL_LABEL.match(_text(ln).strip()) and not STICKER.match(_text(ln).strip())]
     labels = []  # (index, line, label word)
     for i, ln in enumerate(lines):
         if LABEL.search(_clean(_text(ln))):
@@ -158,7 +163,8 @@ def parse(lines):
     if best_tier == 2:
         out["notes"].append("No Money/Volume label found next to the number; used the largest number. Please check it.")
         counters = counters[:1]
-    if len(counters) == 1 and screen:
+    if screen and (len(counters) == 1 or screen_title(lines)):  # a menu screen ("2.Money All") shows ONE counter
+        counters = counters[:1]  # the largest number; the menu title outranks the 'Volume' label
         # One counter on screen: the menu title decides (on Johnny's pump the money counter is shown under
         # "2.Money All" even though its line reads "Volume").
         out[screen] = counters[0][3]
@@ -176,7 +182,38 @@ def parse(lines):
             out["notes"].append("Could not tell if %s is the peso or the liter totalizer. Please choose."
                                 % out["unassigned"])
     out["reading"] = out["amount"] or out["volume"] or out["unassigned"]
+    out["counter_hint"], out["counter_strong"], out["counter_why"] = counter_hint(lines, out)
     return out
+
+
+FUZZY_MONEY = re.compile(r"\bM[O0]N[E3]Y\b|\bBANK\b", re.I)            # "2.Money All", "Mon3y", "3.Type Money / Bank"
+FUZZY_OIL = re.compile(r"\bREP[O0]RT\b|\b[O0][iIl1!|][lL1!I|]\b", re.I)  # "1.Report Oil", "Oi!", "0il"
+LITE_WORD = re.compile(r"\b(LITE|LITER|LITERS|LITRE|LITRES|LTR|LTRS)\b", re.I)
+
+
+def counter_hint(lines, out):
+    """Peso or liter counter, from several signals (Oct 9 Mac test: Apple Vision dropped the "2.Money All" title, so
+    "Volume 2595535" was taken as liters). Returns (counter or None, strong?, why).
+    Strong: a fuzzy screen title (Money/Mon3y/Bank -> pesos; Report/Oil/Oi! -> liters), the word 'lite(rs)', or two
+    decimals on the reading (this pump's liter counter shows 32749.80). The 'Volume' label alone is WEAK: on these
+    pumps the peso screen says "Volume" too. The pump's own readings decide the rest (core.classify_reading)."""
+    texts = [_text(ln) for ln in lines]
+    money = any(FUZZY_MONEY.search(t) for t in texts)
+    oil = any(FUZZY_OIL.search(t) for t in texts)
+    val = out.get("reading") or ""
+    lite = any(LITE_WORD.search(t) for t in texts)
+    two_dec = bool(re.fullmatch(r"\d+\.\d{2}", val))
+    liters = oil or lite or two_dec
+    if money and not liters:
+        return "amount", True, "screen title says Money"
+    if liters and not money:
+        return "volume", True, ("screen title says Report Oil" if oil else "'lite(rs)' on screen" if lite
+                                else "reading has 2 decimals")
+    if out.get("amount") and not out.get("volume"):
+        return "amount", False, "label only"
+    if out.get("volume") and not out.get("amount"):
+        return "volume", False, "label only"
+    return None, False, "no signal"
 
 
 MENU_TITLE = re.compile(r"^\W*\d{1,2}\s*[.)]\s*([A-Za-z]+(?:\s+[A-Za-z]+)?)")
@@ -202,4 +239,9 @@ def screen_kind(lines):
                 k = {"L": "volume", "PHP": "amount"}.get(_unit_of(word))
                 if k:
                     return k
+    texts = [_text(ln) for ln in lines]  # title garbled or without its menu number: fuzzy words
+    money = any(FUZZY_MONEY.search(t) for t in texts)
+    oil = any(FUZZY_OIL.search(t) for t in texts)
+    if money != oil:
+        return "amount" if money else "volume"
     return None

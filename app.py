@@ -230,6 +230,14 @@ class Handler(BaseHTTPRequestHandler):
                 if errors:
                     return self.send_json({"error": " ".join(errors)}, 400)
                 return self.send_json(dict(pump_payload(), reading=rec, warnings=warnings, placed=rec.get("placed")))
+            if path == "/api/pump/classify":
+                return self.send_json(core.classify_reading(data.get("pump_id"), data.get("kind"), data.get("value"),
+                                                            data.get("hint"), bool(data.get("strong"))))
+            if path == "/api/pump/move":
+                errors = core.move_reading(data.get("pump_id"), data.get("counter"), data.get("kind") or "close")
+                if errors:
+                    return self.send_json({"error": " ".join(errors)}, 400)
+                return self.send_json(dict(pump_payload(), moved=data.get("counter")))
             if path == "/api/pump/swap":
                 errors = core.swap_reading(data.get("pump_id"), data.get("counter"))
                 if errors:
