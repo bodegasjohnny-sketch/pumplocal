@@ -77,6 +77,7 @@
   td, th { padding:10px 6px; border-bottom:1px solid var(--line); text-align:left; }
   th { color:var(--muted); font-size:12px; text-transform:uppercase; }
   td.r, th.r { text-align:right; }
+  @media (max-width:520px) { .hs { display:none; } td, th { padding:9px 4px; } header { padding:10px 12px 10px; } }
   .chip { display:inline-block; padding:2px 8px; border-radius:6px; font-size:12px; font-weight:700; color:#fff; }
   .chip.Premium { background:var(--premium); } .chip.Unleaded { background:var(--unleaded); } .chip.Diesel { background:var(--diesel); color:#111; }
   .chip.other { background:#777; }
@@ -175,7 +176,7 @@
     <div class="card">
       <h2>Sales <span class="tl">· Mga benta</span></h2>
       <div style="overflow-x:auto"><table>
-        <thead><tr><th>Time</th><th>Fuel</th><th class="r">Liters</th><th class="r">₱/L</th><th class="r">Amount</th><th>Sync</th><th></th></tr></thead>
+        <thead><tr><th>Time</th><th>Fuel</th><th class="r">Liters</th><th class="r hs">₱/L</th><th class="r">Amount</th><th>Sync</th><th></th></tr></thead>
         <tbody id="salesBody"></tbody>
       </table></div>
     </div>
@@ -271,6 +272,7 @@
     if (!s) return;
     $("netDot").className = "dot " + (s.online ? "on" : "off");
     $("netLabel").textContent = s.label;
+    $("netLabel").parentNode.title = "Cloud sync (only part that needs internet). " + (s.reason || s.last_error || "");
   }
   function loadStatus() {
     api("/api/status").then(function (j) {
@@ -394,7 +396,7 @@
       $("salesBody").innerHTML = s.sales.length ? s.sales.map(function (x) {
         return "<tr><td>" + esc(x.created_at.slice(11, 16)) + '</td><td><span class="chip ' + fuelClass(x.fuel_type) + '">' + esc(x.fuel_type) +
           '</span>' + (x.source === "photo" ? " 📷" : "") + (x.note ? ' <span title="' + esc(x.note) + '">ⓘ</span>' : "") +
-          '</td><td class="r">' + x.liters + '</td><td class="r">' + Number(x.price_per_liter).toFixed(2) + '</td><td class="r"><b>' +
+          '</td><td class="r">' + x.liters + '</td><td class="r hs">' + Number(x.price_per_liter).toFixed(2) + '</td><td class="r"><b>' +
           peso(x.amount_pesos) + "</b></td><td>" + (x.synced ? "✓" : "⏳") + '</td><td><button class="x" data-id="' + x.id + '">void</button></td></tr>';
       }).join("") : '<tr><td colspan="7" style="color:#5c677d">No sales yet this shift.</td></tr>';
     });

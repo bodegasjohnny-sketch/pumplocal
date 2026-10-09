@@ -213,6 +213,13 @@ def summary_context(s):
 
 def template_answer(question, s, lang):
     q = (question or "").lower()
+    if any(w in q for w in ("cash", "kulang", "sobra", "pera", "short", "over")):
+        c = s.get("last_cash_check")
+        if not c:
+            return ("Wala pang cash check ngayong shift." if lang == "tl" else "No cash check yet this shift.")
+        return template_cash_text(c, lang) + (
+            " (Inaasahan: %s, nabilang: %s)" % (core.peso(c["expected"]), core.peso(c["declared"])) if lang == "tl"
+            else " (Expected %s, declared %s.)" % (core.peso(c["expected"]), core.peso(c["declared"])))
     target = None
     for f in s["fuels"]:
         if f["fuel_type"].lower() in q:

@@ -205,6 +205,8 @@ class MockFlowTest(unittest.TestCase):
         code, a = call(self.b, "/api/ask", {"question": "What are total sales this shift?"})
         self.assertEqual(a["lang"], "en")
         self.assertIn("₱17,850.00", a["answer"])
+        code, a = call(self.b, "/api/ask", {"question": "May kulang ba sa cash?"})
+        self.assertIn("Inaasahan", a["answer"])
 
     def test_7_void_and_sync_offline(self):
         code, sh = call(self.b, "/api/shift")

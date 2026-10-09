@@ -154,7 +154,7 @@ def main():
     print("PumpLocal running at %s" % url)
     print("  Local AI: %s (%s)" % (a["detail"], core.MODEL))
     print("  Cloud sync: %s" % sync.status()["label"])
-    print("  Press Ctrl+C to stop.")
+    print("  Press Ctrl+C to stop.", flush=True)
     if os.environ.get("NO_BROWSER") != "1":
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
     try:

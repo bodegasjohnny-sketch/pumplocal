@@ -30,13 +30,13 @@ _lock = threading.Lock()
 def status():
     q = core.queued_count()
     if not SYNC_URL:
-        label = "Offline, %d records queued (no SYNC_URL set)" % q
+        label = "Offline, %d records queued" % q
     elif State.online:
         label = "Online, %d records queued" % q if q else "Online, all synced"
     else:
         label = "Offline, %d records queued" % q
     return {"configured": bool(SYNC_URL), "online": bool(SYNC_URL) and State.online, "queued": q,
-            "label": label, "last_attempt": State.last_attempt, "last_success": State.last_success,
+            "label": label, "reason": "" if SYNC_URL else "SYNC_URL not set (cloud sync disabled)", "last_attempt": State.last_attempt, "last_success": State.last_success,
             "last_error": State.last_error}
 
 
