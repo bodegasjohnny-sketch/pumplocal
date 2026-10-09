@@ -16,9 +16,14 @@ In the app, tap a thumbnail under "Try a sample" on the Photo tab.
 
 | File | Shows | Expected reading |
 |---|---|---|
-| `real_totalizer_diesel2.png` | **REAL photo** from the team's own station: a pump's LCD totalizer menu ("2.Money All", "Volume 775397", Cancel / Ok) with the sticker label "DIESEL 2" | Totalizer 775397, pump Diesel 2, fuel Diesel |
+| `real_totalizer_diesel2.png` | **REAL photo** from the team's own station: a pump's LCD totalizer menu ("2.Money All", "Volume 775397", Cancel / Ok) with the sticker label "DIESEL 2" | **Peso** (money) totalizer 775397, whole number; pump Diesel 2, fuel Diesel |
 
-This is a real asset, taken at Johnny's station (not generated). The display shows the raw counter only, so it is not
-clear whether 775397 is liters with hidden decimals (7753.97 / 775.397) or pesos. In the app the unit (Liters or
-Pesos) and the number of hidden decimal places are set per pump. In the app, open the **Pump** tab and tap the
-sample thumbnail to read it as an opening or closing reading.
+This is a real asset, taken at Johnny's station (not generated). The screen title "2.Money All" means this is the
+pump's lifetime **peso** counter, even though the line itself says "Volume". The pump's **liter** counter is on a
+separate "Volume All" screen, which is not in this photo. Readings are whole numbers. In the app, open the **Pump** tab
+and tap the sample thumbnail to read it into the peso field of an opening or closing reading.
+
+## Other worker's assets
+
+`closing_sheet_clean.png`, `closing_sheet_photo.jpg` and `closing_sheet_answer.json` are a synthetic closing-sheet form
+and its expected answer. They are not shown as photo samples in the app.

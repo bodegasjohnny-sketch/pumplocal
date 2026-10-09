@@ -24,15 +24,27 @@ Built for **AppBuildersPH Hackathon 2026**, theme: **Local AI**.
    - **First: Apple Vision OCR** (`ocr/ocr.swift`, `VNRecognizeTextRequest`, accurate level, language correction off) returns text lines with positions. **Code, not AI** (`meterparse.py`) finds the fuel keyword (PREMIUM/UNLEADED/DIESEL) and links each number to the nearest label: AMOUNT/PESOS/TOTAL, LITERS/LITRO/VOLUME, PRICE/PER LITER. Numbers next to CASH, CHANGE, DATE or PUMP are ignored. It then checks that liters × price equals the amount within 1%. If only two of the three values are readable, the third is computed in code.
    - **Fallback: Gemma 3 4B** reads the photo only if OCR is unavailable, fails, or its numbers don't add up. The model's messy output (code fences, extra chatter, `₱1,000.00` strings) is parsed and checked the same way. If parsing fails, the fields stay blank and a note asks staff to type them in.
 2. **Pump: Metro ng Pump (totalizer check).** A pump's totalizer is its lifetime counter. For each pump/nozzle (name such as "Diesel 2", fuel type), staff record an **OPENING** reading at shift start and a **CLOSING** reading at shift end, typed in or read from a photo with the same OCR-first pipeline (Apple Vision, then Gemma only as fallback).
-   - **Code, not AI** (`totalizer.py`) picks the largest standalone number next to Volume/Vol/Total/Money/Amount/Liters, ignores menu numbers such as the "2." in "2.Money All", ignores dates and the number in a pump label, and detects the pump label (DIESEL 2, PREMIUM 1, UNLEADED) so the right pump is preselected.
-   - Each pump has a **unit** (Liters or Pesos) and a **hidden-decimals** setting (0 by default; 2 or 3 means 775397 is 7,753.97 or 775.397). Some pump screens don't show the decimal point or the unit, so staff set this once per pump.
-   - **Code computes** dispensed = closing − opening (closing lower than opening is flagged as an error: misread, wrong decimals or a rolled-over counter, never a negative sale). It then compares the pump total for each fuel with the liters (or pesos) of sales recorded this shift: *"Pump says 181 L dispensed; recorded sales 174.216 L; 6.784 L (3.75%) unaccounted"*. Over the tolerance (default 0.5%, editable in the tab) the card turns **red**. More recorded than dispensed is flagged too (a duplicate sale or a misread meter).
+   - Each pump has **two running lifetime counters**, and PumpLocal stores both: the **peso totalizer** ("Money All", e.g. 775397 on the real photo) and the **liter totalizer** ("Volume All"). Staff can save one or both from each photo or type them in.
+   - **Code, not AI** (`totalizer.py`) reads the screen title ("2.Money All" means a peso counter, "1.Volume All" means liters; otherwise each number's own Money/Amount or Volume/Liters label decides). It ignores menu numbers such as the "2." in "2.Money All", dates, and the number in a pump label, and detects the pump label (DIESEL 2, PREMIUM 1, UNLEADED) so the right pump is preselected. A number with no clear label is shown for staff to place, never guessed silently.
+   - Readings are **whole numbers** by default. Each counter has an optional hidden-decimals setting (0–3) for pumps whose screen hides the decimal point.
+   - **Code computes** dispensed = closing − opening for both counters. A closing lower than the opening is flagged as an error (a misread, wrong decimals or a counter rollover), never a negative sale. It then compares each fuel's pump totals with the sales recorded this shift, in liters and in gross pesos: *"Pump says 181 L dispensed; recorded sales 174.216 L; 6.784 L (3.75%) unaccounted"* and *"Pump says ₱10,390.00 dispensed; recorded sales ₱10,000.00; ₱390.00 (3.75%) unaccounted"*. Over the tolerance (default 0.5%, editable in the tab) the card turns **red**. More recorded than dispensed is flagged too, since it can mean a duplicate sale or a misread meter. Credit (utang) sales count as recorded sales here, because the fuel did leave the pump.
+   - **Implied price check:** pesos dispensed ÷ liters dispensed should equal the posted price within **±₱0.05/L** (`PRICE_TOLERANCE`). If the price changed mid-shift, staff enter the old and new price under "Price changed this shift", and any implied price inside that range (±₱0.05) passes. A mismatch is shown as a yellow **warning to re-check the readings**. It is not a missing-fuel flag and does not turn the card red.
    - The local Gemma model only writes a short English or Tagalog explanation of those numbers, labeled as AI wording, with a template fallback. The gap also appears in the Cash Check summary and in the Ask data, so *"May kulang ba sa diesel?"* gets a straight answer.
    - At "Start new shift", each pump's closing reading carries over as the next shift's opening.
-3. **Cash Check: Bilang ng pera.** At shift end, staff enter the declared cash, plus an optional opening float and GCash/card total. **Code, not the AI**, computes the expected cash from saved sales and flags SHORT or OVER with the peso amount and the percent. The AI only writes a 1–2 sentence explanation, which is labeled as AI wording. The pump-vs-sales gap for each fuel is shown in the same summary.
+3. **Cash Check: Bilang ng pera.** At shift end, staff enter the declared cash, plus an optional opening float and GCash/card total. **Code, not the AI**, computes the expected cash and flags SHORT or OVER with the peso amount and the percent:
+
+   **expected cash = opening float + gross sales − discounts − credit (utang) − expenses − GCash/card**
+
+   The Cash tab shows this as a line-by-line breakdown.
+   - **Discounts:** the sale form has an optional peso discount with a reason (suki, senior, PWD or other). The liters stay as pumped, and the customer pays the amount minus the discount.
+   - **Credit (utang):** a sale to a named customer counts as a sale and as fuel dispensed, but not as drawer cash.
+   - **Expenses / petty cash:** typed in, or read from a receipt photo. Code finds the TOTAL line, using the same OCR-first pipeline with Gemma as fallback. Expenses can be voided.
+   - **Bill count:** staff enter how many ₱1000, ₱500, ₱200, ₱100, ₱50 and ₱20 bills they have, plus coins. Code adds them up, and the total fills in the declared cash.
+
+   The AI only writes a 1–2 sentence explanation, which is labeled as AI wording. The pump-vs-sales gap for each fuel is shown in the same summary. Discounts, credit and expenses are part of the Ask data too, for questions like *"Magkano ang utang ngayon?"*. The AI only writes a 1–2 sentence explanation, which is labeled as AI wording. The pump-vs-sales gap for each fuel is shown in the same summary.
 4. **Ask: Magtanong.** Staff type questions like *"Magkano ang benta ng diesel ngayon?"* or *"May kulang ba sa diesel?"* Code computes the shift totals and gives them to the model as its only data. The model answers in the same language. If the answer contains a number that isn't in the computed data, PumpLocal shows a warning.
 5. **Offline sync queue.** Every record is saved locally in SQLite with `synced=0`. A Sync button (plus a background check every 30 s) POSTs unsynced records to `SYNC_URL`. When that fails or `SYNC_URL` isn't set, the header shows **"Offline, N records queued"**. Nothing else depends on the internet.
-6. **Demo data.** On first run the app seeds a realistic shift: 15 sales across Premium (₱64.99/L), Unleaded and Diesel, plus a **Diesel 2** pump (liters, 0 decimals) with an opening totalizer of **775397** (the number on the real photo) and a closing of **775578**. **The closing reading is demo data**, chosen so the pump says 181 L while the seeded diesel sales add up to 174.216 L, so the Pump tab shows a 6.784 L (3.75%) gap right away. [`/samples`](samples/) has three **synthetic** images and one **REAL photo** of a totalizer screen from the team's own station (`real_totalizer_diesel2.png`).
+6. **Demo data.** On first run the app seeds a realistic shift: 15 sales across Premium (₱64.99/L), Unleaded and Diesel, a ₱50 senior discount, one ₱3,000 diesel credit sale ("Mang Ben (trucking)"), two expenses (₱150 and ₱350), and a **Diesel 2** pump. The pump's opening **peso** totalizer is **775397**, the number on the real photo. **All other pump readings are demo data**: liters 13508 → 13689 and pesos 775397 → 785787. They are chosen so the pump says 181 L / ₱10,390 while the seeded diesel sales add up to 174.216 L / ₱10,000, which shows a 6.784 L / ₱390 (3.75%) gap right away. The implied price is ₱57.40/L, so the price check passes. [`/samples`](samples/) has three **synthetic** images and one **REAL photo** of a totalizer screen from the team's own station (`real_totalizer_diesel2.png`).
 
 All arithmetic is done in Python with `Decimal`, never by the model. That covers `liters = pesos ÷ price`, totals, expected cash, the difference and percent, and pump dispensed / gap / tolerance.
 
@@ -72,6 +84,7 @@ A database created before the Pump feature gets the Diesel 2 demo pump automatic
 | `PORT` / `HOST` | `8080` / `127.0.0.1` | Use `HOST=0.0.0.0` to open the app from a phone on the same Wi-Fi/LAN |
 | `CASH_TOLERANCE` | `5.00` | Differences within this many pesos count as a match |
 | `PUMP_TOLERANCE_PCT` | `0.5` | Default pump-vs-sales tolerance in percent (can be changed in the Pump tab) |
+| `PRICE_TOLERANCE` | `0.05` | Implied price-per-liter check tolerance in pesos (a warning only) |
 | `MOCK_AI` | `0` | `1` = no Ollama needed (canned or template AI output, for testing) |
 | `DB_PATH` | `./pumplocal.db` | SQLite file |
 | `NO_BROWSER` | `0` | `1` = don't auto-open the browser |
@@ -86,7 +99,7 @@ python3 -m unittest discover -s tests -v
 
 The tests start the real server and exercise every endpoint. They run in mock mode, against a fake sync receiver and a fake Ollama server (which checks the real request format), and with Ollama unreachable to confirm the app still works. No internet or model is needed.
 
-Apple Vision only runs on macOS, so the OCR parser is tested with realistic Vision-format line output for each sample (`tests/ocr_fixtures/`, `tests/test_meterparse.py`). The totalizer parser is tested against the text of the real Diesel 2 photo ("2.Money All", "Volume 775397", "Cancel", "Ok", "DIESEL 2", "Am", "Qua") plus OCR variants, and the pump math (decimals, closing-below-opening guard, gap, tolerance) and endpoints are covered in `tests/test_totalizer.py` and `tests/test_pump_flow.py`. The pipeline tests swap in a stand-in OCR program (`OCR_BIN`) to cover `READER=auto|vision|gemma`, the Gemma fallback, and the "Local AI busy" status.
+Apple Vision only runs on macOS, so the OCR parser is tested with realistic Vision-format line output for each sample (`tests/ocr_fixtures/`, `tests/test_meterparse.py`). The totalizer parser is tested against the text of the real Diesel 2 photo ("2.Money All", "Volume 775397", "Cancel", "Ok", "DIESEL 2", "Am", "Qua") plus OCR variants, and the pump math (peso and liter counters, decimals, closing-below-opening guard, gap, tolerance, implied price with and without a mid-shift price change, migration of v1 readings) and endpoints are covered in `tests/test_totalizer.py` and `tests/test_pump_flow.py`. Discounts, credit, expenses (including receipt TOTAL parsing), the bill count and the expected-cash formula are covered in `tests/test_cash_extras.py`. The pipeline tests swap in a stand-in OCR program (`OCR_BIN`) to cover `READER=auto|vision|gemma`, the Gemma fallback, and the "Local AI busy" status.
 
 ## What runs locally vs. what needs internet
 
@@ -103,7 +116,7 @@ If Ollama isn't running, the app still works. On a Mac, photos are still read by
 
 - **Outages:** brownouts and weak or dead mobile data are common, and a station can't stop recording sales when the internet drops.
 - **Data privacy:** sales and cash figures stay on the station's own computer until the owner chooses to sync.
-- **Catch unrecorded sales, even offline:** the pump's own totalizer is compared with recorded sales on the station's computer, so an owner sees "6.784 L unaccounted" at shift end without any internet connection or cloud service.
+- **Catch unrecorded sales, even offline:** the pump's own totalizer is compared with recorded sales on the station's computer, so an owner sees "6.784 L / ₱390 unaccounted" at shift end without any internet connection or cloud service.
 - **No per-call API costs:** fuel retail runs on thin margins, and a local model has no per-request fee.
 
 ## Disclosures
@@ -113,7 +126,7 @@ If Ollama isn't running, the app still works. On a Mac, photos are still read by
 - **APIs:** none required. The optional sync endpoint (`SYNC_URL`) is the only network call.
 - **Existing code:** none. Everything was built during the hackathon.
 - **AI dev tools:** Grok Bot.
-- **Sample images:** three are synthetic, computer-generated (not photos of real pumps or receipts). `samples/real_totalizer_diesel2.png` is a **real photo** of a pump totalizer screen at the team's own station, a real asset. The seeded closing reading (775578) is demo data.
+- **Sample images:** three are synthetic, computer-generated (not photos of real pumps or receipts). `samples/real_totalizer_diesel2.png` is a **real photo** of a pump totalizer screen at the team's own station, a real asset. Only its peso reading (775397) is real; the other seeded pump readings, discounts, credit sales and expenses are demo data.
 - **Demo prices:** the seeded prices (Premium ₱64.99, Unleaded ₱61.25, Diesel ₱57.40) are demo values, not live pump prices.
 
 ## Project layout
@@ -124,7 +137,7 @@ core.py       SQLite storage + all money/liters math (Decimal)
 ai.py         Photo pipeline (Vision first, Gemma fallback), Ollama calls, prompts, status, mock mode
 vision.py     Compiles/caches and runs the Apple Vision OCR helper (macOS only)
 meterparse.py OCR lines -> fields in code: label proximity, 1% liters x price check
-totalizer.py  OCR lines -> pump totalizer reading + pump label in code
+totalizer.py  OCR lines -> peso/liter totalizer readings + pump label in code
 ocr/          ocr.swift (Apple Vision OCR helper; binary is built on first run)
 sync.py       Offline queue + SYNC_URL uploader
 seed.py       Demo shift loader
@@ -141,7 +154,7 @@ tests/        Unit + end-to-end tests
 - One open shift at a time and one station per install. There are no user accounts or login.
 - The sync payload is a simple JSON batch with no authentication or receiving server included. `SYNC_URL` should point at an endpoint you control.
 - Language detection for answers is a simple Tagalog keyword heuristic.
-- Pump check: sales are matched to pumps by fuel type (sales don't record which nozzle), so pumps of the same fuel are compared as a group. A pump that rolls over past its maximum must be entered by hand. Pump readings are stored locally but are not yet part of the sync queue.
+- Pump check: sales are matched to pumps by fuel type (sales don't record which nozzle), so pumps of the same fuel are compared as a group. A pump that rolls over past its maximum must be entered by hand. Pump readings are stored locally but are not yet part of the sync queue (expenses are). Credit sales are recorded with a customer name only. There's no utang ledger or payment tracking yet.
 
 ## License
 
