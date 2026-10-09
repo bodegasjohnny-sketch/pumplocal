@@ -174,6 +174,13 @@
         <div><label class="f" for="amount">Amount ₱ <span class="tl">· Halaga</span></label>
           <input class="num" id="amount" inputmode="decimal" placeholder="₱0.00"></div>
       </div>
+      <div class="row3" style="grid-template-columns:1fr 1fr">
+        <div><label class="f" for="discount">Discount ₱ <span class="tl">· Diskwento (optional)</span></label>
+          <input class="num" id="discount" inputmode="decimal" placeholder="0.00" style="font-size:18px;padding:10px"></div>
+        <div><label class="f" for="discReason">Reason <span class="tl">· Dahilan</span></label>
+          <select class="sel" id="discReason" style="padding:13px"><option value="">—</option><option value="suki">Suki</option>
+            <option value="senior">Senior</option><option value="pwd">PWD</option><option value="other">Other</option></select></div>
+      </div>
       <div class="calc" id="calc">Enter any two of liters, price and amount. PumpLocal computes the third.</div>
       <button class="btn green" id="saveBtn">💾 Save Sale · I-save</button>
     </div>
@@ -257,6 +264,19 @@
       <div class="flex"><h2>Cash Check <span class="tl">· Bilang ng pera</span></h2>
         <span class="seg langseg" id="langSeg"><button data-l="en" class="on">EN</button><button data-l="tl">TL</button></span></div>
       <p class="hint">At shift end, count the cash drawer. PumpLocal computes the expected cash from saved sales and flags any difference.</p>
+      <details id="countBox"><summary>🧮 Count the bills · Bilangin ang pera</summary>
+        <div class="row4" style="margin-top:8px" id="denoms">
+          <div><label class="f">₱1000 ×</label><input class="txt dn" data-d="1000" inputmode="numeric" placeholder="0" style="font-size:17px;padding:8px"></div>
+          <div><label class="f">₱500 ×</label><input class="txt dn" data-d="500" inputmode="numeric" placeholder="0" style="font-size:17px;padding:8px"></div>
+          <div><label class="f">₱200 ×</label><input class="txt dn" data-d="200" inputmode="numeric" placeholder="0" style="font-size:17px;padding:8px"></div>
+          <div><label class="f">₱100 ×</label><input class="txt dn" data-d="100" inputmode="numeric" placeholder="0" style="font-size:17px;padding:8px"></div>
+          <div><label class="f">₱50 ×</label><input class="txt dn" data-d="50" inputmode="numeric" placeholder="0" style="font-size:17px;padding:8px"></div>
+          <div><label class="f">₱20 ×</label><input class="txt dn" data-d="20" inputmode="numeric" placeholder="0" style="font-size:17px;padding:8px"></div>
+          <div style="grid-column:span 2"><label class="f">Coins ₱ <span class="tl">· Barya</span></label><input class="txt dn" data-d="coins" inputmode="decimal" placeholder="0.00" style="font-size:17px;padding:8px"></div>
+        </div>
+        <div class="calc" id="countTotal">Enter how many of each bill. PumpLocal adds them up.</div>
+        <button class="btn small ghost" id="useCountBtn">Use as declared cash · Gamitin</button>
+      </details>
       <label class="f" for="declared">Declared cash ₱ <span class="tl">· Perang nasa kaha</span></label>
       <input class="num" id="declared" inputmode="decimal" placeholder="₱0.00">
       <div class="row3" style="grid-template-columns:1fr 1fr">
@@ -268,6 +288,32 @@
       <div style="height:14px"></div>
       <button class="btn navy" id="cashBtn">🧮 Check Cash · Suriin</button>
       <div id="cashResult"></div>
+    </div>
+    <div class="card">
+      <h2>Expenses <span class="tl">· Gastos (petty cash)</span></h2>
+      <p class="hint">Cash taken from the drawer for small expenses. Subtracted from expected cash.</p>
+      <div id="expList"></div>
+      <div class="row3" style="grid-template-columns:1fr 2fr">
+        <div><label class="f" for="expAmount">Amount ₱</label><input class="txt" id="expAmount" inputmode="decimal" placeholder="0.00" style="font-size:17px;padding:10px"></div>
+        <div><label class="f" for="expDesc">For what <span class="tl">· Para saan</span></label><input class="txt" id="expDesc" placeholder="Ice and water" style="font-size:17px;padding:10px"></div>
+      </div>
+      <div id="expMsg"></div>
+      <div class="flex" style="margin-top:10px;justify-content:flex-start">
+        <button class="btn small green" id="expSave">＋ Add expense</button>
+        <label class="btn small ghost" for="expFile">📷 Receipt</label><input type="file" id="expFile" accept="image/*" capture="environment">
+      </div>
+    </div>
+    <div class="card">
+      <h2>Credit sales <span class="tl">· Utang</span></h2>
+      <p class="hint">Fuel given on credit counts as a sale but is not in the drawer.</p>
+      <div id="creditList"></div>
+      <div class="row3">
+        <div><label class="f" for="crCustomer">Customer <span class="tl">· Pangalan</span></label><input class="txt" id="crCustomer" placeholder="Mang Ben" style="font-size:17px;padding:10px"></div>
+        <div><label class="f" for="crFuel">Fuel</label><select class="sel" id="crFuel"><option>Diesel</option><option>Premium</option><option>Unleaded</option></select></div>
+        <div><label class="f" for="crAmount">Amount ₱</label><input class="txt" id="crAmount" inputmode="decimal" placeholder="0.00" style="font-size:17px;padding:10px"></div>
+      </div>
+      <div style="height:10px"></div>
+      <button class="btn small green" id="crSave">＋ Add credit sale</button>
     </div>
   </section>
 
@@ -337,6 +383,7 @@
     document.querySelectorAll(".tab").forEach(function (x) { x.classList.toggle("active", x.id === "tab-" + name); });
     if (name === "sales") loadShift();
     if (name === "pump") loadPump();
+    if (name === "cash") loadCashExtras();
     window.scrollTo(0, 0);
   }
 
@@ -456,7 +503,7 @@
   document.querySelectorAll(".fuel").forEach(function (b) { b.addEventListener("click", function () { setFuel(b.dataset.f); }); });
 
   var recalcTimer;
-  ["liters", "price", "amount"].forEach(function (id) { $(id).addEventListener("input", function () {
+  ["liters", "price", "amount", "discount"].forEach(function (id) { $(id).addEventListener("input", function () {
     clearTimeout(recalcTimer); recalcTimer = setTimeout(recalc, 250); }); });
 
   function recalc() {
@@ -465,8 +512,10 @@
       $("calc").innerHTML = "Enter any two of liters, price and amount. PumpLocal computes the third."; return; }
     api("/api/reconcile", body).then(function (r) {
       if (r.error) return;
+      var disc = Number(($("discount").value || "0").replace(/[^\d.]/g, "")) || 0;
       var html = r.liters && r.price_per_liter && r.amount_pesos
-        ? "Will save: <b>" + r.liters + " L</b> × <b>" + peso(r.price_per_liter) + "</b> = <b>" + peso(r.amount_pesos) + "</b>"
+        ? "Will save: <b>" + r.liters + " L</b> × <b>" + peso(r.price_per_liter) + "</b> = <b>" + peso(r.amount_pesos) + "</b>" +
+          (disc ? " − discount " + peso(disc) + " (customer pays " + peso(Number(r.amount_pesos) - disc) + ")" : "")
         : "Need at least two of liters, price and amount.";
       (r.notes || []).forEach(function (n) { html += '<div style="color:#5c677d;font-size:13px">✓ ' + esc(n) + "</div>"; });
       (r.warnings || []).forEach(function (w) { html += '<div class="note warn">' + esc(w) + "</div>"; });
@@ -478,12 +527,13 @@
     if (!state.fuel) { toast("Choose the fuel type first · Piliin ang uri"); return; }
     $("saveBtn").disabled = true;
     api("/api/sales", { fuel_type: state.fuel, liters: $("liters").value, price_per_liter: $("price").value,
-      amount_pesos: $("amount").value, source: state.source }).then(function (j) {
+      amount_pesos: $("amount").value, source: state.source, discount_pesos: $("discount").value,
+      discount_reason: $("discReason").value }).then(function (j) {
       $("saveBtn").disabled = false;
       if (j.error) { toast(j.error, 3500); return; }
       toast("Saved ✓ " + j.sale.fuel_type + " " + peso(j.sale.amount_pesos) + " · Na-save");
       renderSync(j.sync);
-      ["liters", "price", "amount"].forEach(function (id) { $(id).value = ""; });
+      ["liters", "price", "amount", "discount", "discReason"].forEach(function (id) { $(id).value = ""; });
       setFuel(""); state.source = "manual"; $("extractMsg").innerHTML = ""; $("preview").style.display = "none"; recalc();
     });
   });
@@ -502,7 +552,8 @@
       $("stats").innerHTML = html;
       $("salesBody").innerHTML = s.sales.length ? s.sales.map(function (x) {
         return "<tr><td>" + esc(x.created_at.slice(11, 16)) + '</td><td><span class="chip ' + fuelClass(x.fuel_type) + '">' + esc(x.fuel_type) +
-          '</span>' + (x.source === "photo" ? " 📷" : "") + (x.note ? ' <span title="' + esc(x.note) + '">ⓘ</span>' : "") +
+          '</span>' + (x.source === "photo" ? " 📷" : "") + (x.payment === "credit" ? ' <span class="chip other" title="Credit (utang)">UTANG ' + esc(x.customer) + "</span>" : "") +
+          (Number(x.discount_pesos) ? ' <span title="Discount (' + esc(x.discount_reason) + ')">−' + peso(x.discount_pesos) + " " + esc(x.discount_reason) + "</span>" : "") + (x.note ? ' <span title="' + esc(x.note) + '">ⓘ</span>' : "") +
           '</td><td class="r">' + x.liters + '</td><td class="r hs">' + Number(x.price_per_liter).toFixed(2) + '</td><td class="r"><b>' +
           peso(x.amount_pesos) + "</b></td><td>" + (x.synced ? "✓" : "⏳") + '</td><td><button class="x" data-id="' + x.id + '">void</button></td></tr>';
       }).join("") : '<tr><td colspan="7" style="color:#5c677d">No sales yet this shift.</td></tr>';
@@ -526,10 +577,84 @@
   document.querySelectorAll(".langseg button").forEach(function (b) { b.addEventListener("click", function () { setLang(b.dataset.l); }); });
   setLang(state.lang);
 
+  function denomCounts() { var c = {}, any = false;
+    document.querySelectorAll("#denoms .dn").forEach(function (i) { if (i.value.trim()) { c[i.dataset.d] = i.value.trim(); any = true; } });
+    return any ? c : null; }
+  var countTimer;
+  document.querySelectorAll("#denoms .dn").forEach(function (i) { i.addEventListener("input", function () {
+    clearTimeout(countTimer); countTimer = setTimeout(updateCount, 250); }); });
+  function updateCount() {
+    var c = denomCounts(); state.count = null;
+    if (!c) { $("countTotal").textContent = "Enter how many of each bill. PumpLocal adds them up."; return; }
+    api("/api/cash/count", { counts: c }).then(function (j) {
+      if (j.error) { $("countTotal").innerHTML = '<span style="color:#8a1c25">' + esc(j.error) + "</span>"; return; }
+      state.count = j;
+      $("countTotal").innerHTML = "Counted: <b>" + peso(j.total) + "</b> <span style='color:#5c677d;font-size:13px'>(" +
+        j.lines.filter(function (l) { return l.count; }).map(function (l) { return "₱" + l.denom + "×" + l.count; }).join(" + ") +
+        (Number(j.coins) ? " + coins " + peso(j.coins) : "") + ")</span>";
+    });
+  }
+  $("useCountBtn").addEventListener("click", function () {
+    if (!state.count) { toast("Count the bills first · Bilangin muna"); return; }
+    $("declared").value = state.count.total; toast("Declared cash = " + peso(state.count.total));
+  });
+  function loadCashExtras() {
+    api("/api/shift").then(function (s) {
+      if (s.error) return;
+      $("expList").innerHTML = s.expenses.length ? "<table>" + s.expenses.map(function (e) {
+        return "<tr><td>" + esc(e.created_at.slice(11, 16)) + "</td><td>" + esc(e.description) + (e.source === "photo" ? " 📷" : "") +
+          '</td><td class="r"><b>' + peso(e.amount_pesos) + '</b></td><td><button class="x" data-exp="' + e.id + '">void</button></td></tr>';
+      }).join("") + "<tr><td></td><td><b>Total</b></td><td class='r'><b>" + peso(s.expenses_total) + "</b></td><td></td></tr></table>" :
+        '<p class="hint">No expenses this shift.</p>';
+      $("creditList").innerHTML = s.credit_sales.length ? "<table>" + s.credit_sales.map(function (c) {
+        return "<tr><td>" + esc(c.created_at.slice(11, 16)) + "</td><td>" + esc(c.customer) + ' <span class="chip ' + fuelClass(c.fuel_type) + '">' +
+          esc(c.fuel_type) + '</span></td><td class="r">' + esc(c.liters) + ' L</td><td class="r"><b>' + peso(c.amount) + "</b></td></tr>";
+      }).join("") + "<tr><td></td><td><b>Total</b></td><td></td><td class='r'><b>" + peso(s.credit_total) + "</b></td></tr></table>" :
+        '<p class="hint">No credit sales this shift.</p>';
+    });
+  }
+  $("expList").addEventListener("click", function (e) {
+    var id = e.target.dataset && e.target.dataset.exp;
+    if (!id || !confirm("Void this expense? · I-void ang gastos?")) return;
+    api("/api/expenses/void", { id: Number(id) }).then(function (j) { renderSync(j.sync); loadCashExtras(); toast("Expense voided"); });
+  });
+  $("expSave").addEventListener("click", function () {
+    api("/api/expenses", { amount_pesos: $("expAmount").value, description: $("expDesc").value, source: state.expSource || "manual" })
+      .then(function (j) {
+        if (j.error) { toast(j.error, 3500); return; }
+        toast("Expense saved ✓ " + peso(j.expense.amount_pesos)); renderSync(j.sync);
+        $("expAmount").value = ""; $("expDesc").value = ""; $("expMsg").innerHTML = ""; state.expSource = "manual"; loadCashExtras();
+      });
+  });
+  $("expFile").addEventListener("change", function (e) {
+    var f = e.target.files[0]; e.target.value = ""; if (!f) return;
+    prepImage(f, { style: {} }, function (dataUrl, full) {
+      busy(true, "Reading receipt on this computer… · Binabasa ang resibo…");
+      var body = { image: dataUrl }; if (full) body.image_full = full;
+      api("/api/expense/extract", body).then(function (j) {
+        busy(false);
+        if (j.amount_pesos) $("expAmount").value = j.amount_pesos;
+        if (j.description && !$("expDesc").value) $("expDesc").value = j.description;
+        state.expSource = j.ok ? "photo" : "manual";
+        $("expMsg").innerHTML = readerLine(j) + (j.fallback_reason ? '<div class="note warn">' + esc(j.fallback_reason) + "</div>" : "") +
+          '<div class="note ' + (j.ok ? "info" : "err") + '">' + esc(j.message || j.error) + "</div>";
+      });
+    });
+  });
+  $("crSave").addEventListener("click", function () {
+    api("/api/credit", { customer: $("crCustomer").value, fuel_type: $("crFuel").value, amount_pesos: $("crAmount").value })
+      .then(function (j) {
+        if (j.error) { toast(j.error, 3500); return; }
+        toast("Credit sale saved ✓ " + j.sale.customer + " " + peso(j.sale.amount_pesos)); renderSync(j.sync);
+        $("crCustomer").value = ""; $("crAmount").value = ""; loadCashExtras();
+      });
+  });
+
   $("cashBtn").addEventListener("click", function () {
-    if (!$("declared").value) { toast("Enter the declared cash · Ilagay ang perang nabilang"); return; }
+    var counts = denomCounts();
+    if (!$("declared").value && !counts) { toast("Enter the declared cash or count the bills · Ilagay ang perang nabilang"); return; }
     busy(true, "Checking cash… · Sinusuri…");
-    api("/api/cashcheck", { declared: $("declared").value, opening_float: $("float").value, noncash: $("noncash").value, lang: state.lang })
+    api("/api/cashcheck", { declared: $("declared").value, counts: counts, opening_float: $("float").value, noncash: $("noncash").value, lang: state.lang })
       .then(function (j) {
         busy(false);
         if (j.error) { toast(j.error, 3500); return; }
@@ -539,11 +664,14 @@
         $("cashResult").innerHTML = '<div class="result ' + r.status + '"><div class="big">' + label + "</div>" +
           '<div style="font-size:22px;font-weight:800;margin-top:4px">' + (Number(r.diff) > 0 ? "+" : "") + peso(r.diff) + pct + "</div>" +
           "<table style='margin-top:10px'>" +
-          "<tr><td>Sales recorded</td><td class='r'>" + peso(r.sales_total) + "</td></tr>" +
           "<tr><td>+ Opening float</td><td class='r'>" + peso(r.opening_float) + "</td></tr>" +
+          "<tr><td>+ Gross sales</td><td class='r'>" + peso(r.gross_sales) + "</td></tr>" +
+          "<tr><td>− Discounts</td><td class='r'>" + peso(r.discounts) + "</td></tr>" +
+          "<tr><td>− Credit (utang)</td><td class='r'>" + peso(r.credit_sales) + "</td></tr>" +
+          "<tr><td>− Expenses</td><td class='r'>" + peso(r.expenses) + "</td></tr>" +
           "<tr><td>− GCash / card</td><td class='r'>" + peso(r.noncash) + "</td></tr>" +
           "<tr><td><b>Expected cash</b></td><td class='r'><b>" + peso(r.expected) + "</b></td></tr>" +
-          "<tr><td><b>Declared cash</b></td><td class='r'><b>" + peso(r.declared) + "</b></td></tr></table>" +
+          "<tr><td><b>Declared cash</b>" + (r.count ? " (counted)" : "") + "</td><td class='r'><b>" + peso(r.declared) + "</b></td></tr></table>" +
           '<div class="ainote"><small>' + (j.explanation_source === "ai" ? "🤖 AI note (wording only; numbers computed by PumpLocal)" :
             "Note (template" + (j.explanation_source === "template-fallback" ? ", local AI unavailable" : "") + ")") +
           "</small>" + esc(j.explanation) + "</div>" +
