@@ -28,6 +28,23 @@ with open(os.path.join(ROOT, "samples", "closing_slip_answer.json")) as _f:
     ANSWER = {k: v for k, v in json.load(_f).items() if not k.startswith("_")}
 
 sys.path.insert(0, HERE)
+
+# The three sale photos of DEMO_SCRIPT.md (Premium with a 20 peso senior discount)
+DEMO_SALES = [
+    {"fuel_type": "Premium", "liters": "15.387", "price_per_liter": "64.99", "amount_pesos": "1000.00",
+     "discount_pesos": "20", "discount_reason": "senior", "source": "photo"},
+    {"fuel_type": "Unleaded", "liters": "8.163", "price_per_liter": "61.25", "amount_pesos": "500.00", "source": "photo"},
+    {"fuel_type": "Diesel", "liters": "34.843", "price_per_liter": "57.40", "amount_pesos": "2000.00", "source": "photo"},
+]
+
+
+def seed_demo_day():
+    """seed.py --demo-empty plus the three sale photos."""
+    with contextlib.redirect_stdout(io.StringIO()):
+        seed.seed_demo_empty()
+    for sale in DEMO_SALES:
+        rec, errors, _ = core.save_sale(dict(sale))
+        assert not errors, errors
 from test_flow import FAKE_OCR, FakeOllama, Server, call, start_fake  # noqa: E402
 
 
@@ -50,8 +67,8 @@ class SlipParseTests(unittest.TestCase):
 
     def test_tilted_pieces_are_joined_into_rows(self):
         rows = slipparse.parse(fixture("closing_slip_photo.json"))["rows"]
-        for row in ("OPENING FLOAT 1,000.00", "NOZZLE O-RING 350.00", "MANG BEN - DIESEL 3,000.00",
-                    "CASH COUNTED 12,950.00"):
+        for row in ("OPENING FLOAT 1,000.00", "NOZZLE O-RING 350.00", "MANG BEN - DIESEL 1,000.00",
+                    "CASH COUNTED 3,220.00"):
             self.assertIn(row, rows)
 
     def test_ocr_noise_case_peso_signs_and_no_boxes(self):
@@ -68,7 +85,8 @@ class SlipParseTests(unittest.TestCase):
         self.assertEqual((r["missing"], r["unreadable"]), (["shift"], []))
 
     def test_missing_and_unreadable_are_reported_not_guessed(self):
-        lines = [ln for ln in fixture("closing_slip_clean.json") if ln["text"] not in ("GCASH", "500.00", "300.00")]
+        lines = [dict(ln, text="CARD") if ln["text"] == "CARD 300.00" else ln  # amount smudged
+                 for ln in fixture("closing_slip_clean.json") if ln["text"] != "GCASH 500.00"]  # row left out
         r = slipparse.parse(lines)
         self.assertEqual((r["gcash"], r["card"], r["noncash"]), (None, None, None))
         self.assertEqual((r["missing"], r["unreadable"]), (["gcash"], ["card"]))
@@ -92,41 +110,40 @@ class SlipParseTests(unittest.TestCase):
 
 
 class SlipShiftTests(unittest.TestCase):
-    """Against the seeded demo shift: the slip's expenses and credit are already recorded."""
+    """Demo Day shift (demo-empty + 3 sales): the slip's expenses and credit are new, the discount matches."""
 
     def setUp(self):
         self.old = core.DB_PATH
         self.tmp = tempfile.mkdtemp()
         core.DB_PATH = os.path.join(self.tmp, "t.db")
-        with contextlib.redirect_stdout(io.StringIO()):
-            seed.seed()
+        seed_demo_day()
         self.slip = slipparse.parse(fixture("closing_slip_photo.json"))
 
     def tearDown(self):
         core.DB_PATH = self.old
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def test_compare_matches_seed_and_previews_a_50_peso_shortage(self):
+    def test_compare_finds_new_items_and_previews_a_50_peso_shortage(self):
         c = core.slip_compare(self.slip)
-        self.assertEqual([e["status"] for e in c["expenses"]], ["recorded", "recorded"])
-        self.assertEqual([(x["status"], x["matched"]) for x in c["credits"]], [("recorded", "Mang Ben (trucking)")])
-        self.assertEqual(c["discounts"], {"slip": "50.00", "recorded": "50.00", "match": True})
+        self.assertEqual([e["status"] for e in c["expenses"]], ["new", "new"])
+        self.assertEqual([(x["customer"], x["status"]) for x in c["credits"]], [("Mang Ben", "new")])
+        self.assertEqual(c["discounts"], {"slip": "20.00", "recorded": "20.00", "match": True})
         p = c["preview"]
-        self.assertEqual((p["expected"], p["declared"], p["diff"], p["status"]), ("13000.00", "12950.00", "-50.00", "SHORT"))
+        self.assertEqual((p["expected"], p["declared"], p["diff"], p["status"]), ("3270.00", "3220.00", "-50.00", "SHORT"))
 
     def test_apply_saves_only_new_items_once(self):
-        slip = dict(self.slip, expenses=self.slip["expenses"] + [{"description": "Load", "amount_pesos": "100"}],
-                    credits=self.slip["credits"] + [{"customer": "Aling Nena", "fuel_type": "Unleaded",
-                                                     "amount_pesos": "612.50"}])
         before = core.shift_summary()
-        r = core.slip_apply(slip)
-        self.assertEqual((len(r["saved_expenses"]), len(r["saved_credits"]), len(r["skipped"]), r["errors"]), (1, 1, 3, []))
+        r = core.slip_apply(self.slip)
+        self.assertEqual((len(r["saved_expenses"]), len(r["saved_credits"]), len(r["skipped"]), r["errors"]), (2, 1, 0, []))
         after = core.shift_summary()
-        self.assertEqual(core.Decimal(after["expenses_total"]) - core.Decimal(before["expenses_total"]), 100)
-        self.assertEqual(core.Decimal(after["credit_total"]) - core.Decimal(before["credit_total"]),
-                         core.Decimal("612.50"))
-        again = core.slip_apply(slip)  # confirm pressed twice: nothing new
-        self.assertEqual((again["saved_expenses"], again["saved_credits"], len(again["skipped"])), ([], [], 5))
+        self.assertEqual(core.Decimal(after["expenses_total"]) - core.Decimal(before["expenses_total"]), 410)
+        self.assertEqual(core.Decimal(after["credit_total"]) - core.Decimal(before["credit_total"]), 1000)
+        self.assertEqual(after["total_amount"], "4500.00")  # the credit sale is a diesel sale at the posted price
+        again = core.slip_apply(self.slip)  # confirm pressed twice: nothing new
+        self.assertEqual((again["saved_expenses"], again["saved_credits"], len(again["skipped"])), ([], [], 3))
+        recheck = core.slip_compare(self.slip)
+        self.assertEqual([x["status"] for x in recheck["credits"]], ["recorded"])
+        self.assertEqual(recheck["preview"]["diff"], "-50.00")
 
     def test_credit_without_fuel_is_an_error_not_a_guess(self):
         slip = dict(self.slip, expenses=[], credits=[{"customer": "Aling Nena", "fuel_type": "", "amount_pesos": "500"}])
@@ -154,7 +171,14 @@ class SlipEndpointTests(unittest.TestCase):
         cls.srv.server_close()
 
     def test_scan_review_confirm_cash_check(self):
-        s = Server(MOCK_AI="0", OLLAMA_URL=self.url, OCR_BIN=self.wrapper,
+        db = os.path.join(self.tmp, "demo.db")
+        old = core.DB_PATH
+        core.DB_PATH = db
+        try:
+            seed_demo_day()
+        finally:
+            core.DB_PATH = old
+        s = Server(MOCK_AI="0", DB_PATH=db, OLLAMA_URL=self.url, OCR_BIN=self.wrapper,
                    FAKE_OCR_JSON=os.path.join(FIXTURES, "closing_slip_photo.json"))
         try:
             before = FakeOllama.image_chats
@@ -167,12 +191,12 @@ class SlipEndpointTests(unittest.TestCase):
             time.sleep(0.2)
             self.assertEqual(FakeOllama.image_chats - before, 0, "Gemma must not be called when OCR worked")
             code, a = call(s.base, "/api/slip/apply", {"slip": j["slip"]})
-            self.assertEqual((code, a["saved_expenses"], a["saved_credits"], len(a["skipped"])), (200, [], [], 3))
+            self.assertEqual((code, len(a["saved_expenses"]), len(a["saved_credits"]), len(a["skipped"])), (200, 2, 1, 0))
             code, c = call(s.base, "/api/cashcheck", {"declared": j["slip"]["cash_counted"],
                                                       "opening_float": j["slip"]["opening_float"],
                                                       "noncash": j["slip"]["noncash"]})
             self.assertEqual((c["result"]["expected"], c["result"]["diff"], c["result"]["status"]),
-                             ("13000.00", "-50.00", "SHORT"))
+                             ("3270.00", "-50.00", "SHORT"))
             code, sm = call(s.base, "/api/samples")
             self.assertEqual((sm["slip_samples"], len(sm["samples"])),
                              (["closing_slip_photo.jpg", "closing_slip_clean.png"], 3))

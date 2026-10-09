@@ -5,9 +5,8 @@
 - samples/closing_slip_photo.jpg   filled, phone-photo style (tilt, shadow, slight blur)
 - samples/closing_slip_answer.json what a correct read must return
 
-The filled numbers are made up and match the seeded demo shift (seed.py): two expenses (P150 + P350),
-the P50 senior discount, Mang Ben's P3,000 diesel credit sale. With these slip values the Cash Check
-expects P13,000.00 and the slip says P12,950.00 was counted: SHORT P50.00.
+The filled numbers are made up and fit the Demo Day flow (DEMO_SCRIPT.md): python3 seed.py --demo-empty, then
+the three sale photos. With the slip the Cash Check expects P3,270.00 and P3,220.00 was counted: SHORT P50.00.
 """
 import json
 import os
@@ -26,23 +25,24 @@ FILLED = {
     "date": "09 OCT 2026",
     "shift": "6AM - 2PM",
     "opening_float": "1,000.00",
-    "expenses": [("ICE AND WATER", "150.00"), ("NOZZLE O-RING", "350.00")],
-    "discounts": "50.00",
-    "credits": [("MANG BEN - DIESEL", "3,000.00")],
+    "expenses": [("ICE AND WATER", "60.00"), ("NOZZLE O-RING", "350.00")],
+    "discounts": "20.00",
+    "credits": [("MANG BEN - DIESEL", "1,000.00")],
     "gcash": "500.00",
     "card": "300.00",
-    "cash_counted": "12,950.00",
+    "cash_counted": "3,220.00",
 }
 ANSWER = {
-    "_note": "Synthetic sample (made-up numbers matching the seeded demo shift). Expected cash with these values: "
-             "1,000 float + 16,350 gross - 50 discounts - 3,000 credit - 500 expenses - 800 GCash/card = 13,000.00; "
-             "counted 12,950.00 -> SHORT 50.00.",
+    "_note": "Synthetic sample (made-up numbers) for the Demo Day flow in DEMO_SCRIPT.md (python3 seed.py --demo-empty, "
+             "then the 3 sale photos with a P20 senior discount on the Premium sale). Expected cash: 1,000 float + "
+             "4,500 gross (1,000 + 500 + 2,000 + Mang Ben's 1,000 credit) - 20 discount - 1,000 credit - 410 expenses "
+             "- 800 GCash/card = 3,270.00; counted 3,220.00 -> SHORT 50.00 (-1.53%).",
     "date": "09 OCT 2026", "shift": "6AM - 2PM", "opening_float": "1000.00",
-    "expenses": [{"description": "Ice and water", "amount_pesos": "150.00"},
+    "expenses": [{"description": "Ice and water", "amount_pesos": "60.00"},
                  {"description": "Nozzle o-ring", "amount_pesos": "350.00"}],
-    "expenses_total": "500.00", "discounts": "50.00",
-    "credits": [{"customer": "Mang Ben", "fuel_type": "Diesel", "amount_pesos": "3000.00"}],
-    "credit_total": "3000.00", "gcash": "500.00", "card": "300.00", "noncash": "800.00", "cash_counted": "12950.00",
+    "expenses_total": "410.00", "discounts": "20.00",
+    "credits": [{"customer": "Mang Ben", "fuel_type": "Diesel", "amount_pesos": "1000.00"}],
+    "credit_total": "1000.00", "gcash": "500.00", "card": "300.00", "noncash": "800.00", "cash_counted": "3220.00",
 }
 
 W, ROW = 1000, 84

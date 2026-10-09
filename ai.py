@@ -466,9 +466,9 @@ SLIP_PROMPT = (
     "anything. Leave out lines you cannot read."
 )
 MOCK_SLIP = ('Here is the text:\n```json\n{"lines": ["JCB SHIFT CLOSING SLIP", "DATE 09 OCT 2026", "SHIFT 6AM - 2PM", '
-             '"OPENING FLOAT 1,000.00", "EXPENSES", "ICE AND WATER 150.00", "NOZZLE O-RING 350.00", "DISCOUNTS 50.00", '
-             '"CREDIT / UTANG", "MANG BEN - DIESEL 3,000.00", "GCASH 500.00", "CARD 300.00", '
-             '"CASH COUNTED 12,950.00"]}\n```')
+             '"OPENING FLOAT 1,000.00", "EXPENSES", "ICE AND WATER 60.00", "NOZZLE O-RING 350.00", "DISCOUNTS 20.00", '
+             '"CREDIT / UTANG", "MANG BEN - DIESEL 1,000.00", "GCASH 500.00", "CARD 300.00", '
+             '"CASH COUNTED 3,220.00"]}\n```')
 
 
 def _slip_result(p, raw, seconds, reader, source):
