@@ -277,12 +277,16 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 """
 
-SYNC_TABLES = ("shifts", "sales", "cash_checks", "expenses")
+# Tables with a synced flag. A row is queued (synced=0) when it is created or changed, and is marked synced=1
+# after the sync server accepts it (sync.py). Pumps and their totalizer readings sync the same way as expenses.
+SYNC_TABLES = ("shifts", "sales", "cash_checks", "expenses", "pumps", "totalizer_readings")
 # Columns added after v1; init_db adds them to older databases.
 MIGRATIONS = {
     "sales": [("discount_pesos", "TEXT NOT NULL DEFAULT '0.00'"), ("discount_reason", "TEXT NOT NULL DEFAULT ''"),
               ("payment", "TEXT NOT NULL DEFAULT 'cash'"), ("customer", "TEXT NOT NULL DEFAULT ''")],
-    "pumps": [("amount_decimals", "INTEGER NOT NULL DEFAULT 0"), ("volume_decimals", "INTEGER NOT NULL DEFAULT 0")],
+    "pumps": [("amount_decimals", "INTEGER NOT NULL DEFAULT 0"), ("volume_decimals", "INTEGER NOT NULL DEFAULT 0"),
+              ("synced", "INTEGER NOT NULL DEFAULT 0")],
+    "totalizer_readings": [("synced", "INTEGER NOT NULL DEFAULT 0")],
     "cash_checks": [("discounts", "TEXT NOT NULL DEFAULT '0.00'"), ("credit_sales", "TEXT NOT NULL DEFAULT '0.00'"),
                     ("expenses", "TEXT NOT NULL DEFAULT '0.00'"), ("cash_count", "TEXT NOT NULL DEFAULT ''")],
 }
@@ -703,7 +707,7 @@ def save_pump(data):
             return None, ["Another pump is already named %s." % name]
         pid = clash[0]["id"]  # same name: update it
     if pid:
-        execute("UPDATE pumps SET name=?, fuel_type=?, amount_decimals=?, volume_decimals=? WHERE id=?",
+        execute("UPDATE pumps SET name=?, fuel_type=?, amount_decimals=?, volume_decimals=?, synced=0 WHERE id=?",
                 (name, fuel, ad, vd, int(pid)))
     else:
         pid = execute("INSERT INTO pumps (name, fuel_type, amount_decimals, volume_decimals, created_at) "
@@ -747,7 +751,7 @@ def save_reading(pump_id, kind, amount=None, volume=None, source="manual", shift
             conn.execute("INSERT INTO totalizer_readings (shift_id, pump_id, kind, created_at) VALUES (?,?,?,?)",
                          key + (created_at or now(),))
         for name, s in vals.items():
-            conn.execute("UPDATE totalizer_readings SET %s=?, %s_source=?, created_at=? WHERE shift_id=? AND pump_id=? "
+            conn.execute("UPDATE totalizer_readings SET %s=?, %s_source=?, created_at=?, synced=0 WHERE shift_id=? AND pump_id=? "
                          "AND kind=?" % (name, name), (s, source, created_at or now()) + key)
         conn.commit()
     rec = rows("SELECT * FROM totalizer_readings WHERE shift_id=? AND pump_id=? AND kind=?", key)[0]

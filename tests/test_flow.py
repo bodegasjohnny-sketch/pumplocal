@@ -183,8 +183,9 @@ class MockFlowTest(unittest.TestCase):
         code, st = call(self.b, "/api/status")
         self.assertTrue(st["ai"]["ok"] and st["ai"]["mock"])
         self.assertFalse(st["sync"]["online"])
-        self.assertEqual(st["sync"]["queued"], 18)  # 1 shift + 15 seeded sales + 2 seeded expenses
-        self.assertTrue(st["sync"]["label"].startswith("Offline, 18 records queued"))
+        # 1 shift + 15 seeded sales + 2 seeded expenses + 1 demo pump + 2 demo totalizer readings
+        self.assertEqual(st["sync"]["queued"], 21)
+        self.assertTrue(st["sync"]["label"].startswith("Offline, 21 records queued"))
         code, sh = call(self.b, "/api/shift")
         self.assertEqual((sh["count"], sh["total_amount"]), (15, "16350.00"))
         self.assertEqual([f["fuel_type"] for f in sh["fuels"]], ["Premium", "Unleaded", "Diesel"])
@@ -202,7 +203,7 @@ class MockFlowTest(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertEqual((saved["sale"]["liters"], saved["sale"]["amount_pesos"], saved["sale"]["synced"]),
                          ("23.080", "1500.00", 0))
-        self.assertEqual(saved["sync"]["queued"], 19)
+        self.assertEqual(saved["sync"]["queued"], 22)
         code, err = call(self.b, "/api/sales", {"fuel_type": "Diesel", "amount_pesos": "100"})
         self.assertEqual(code, 400)
 
@@ -266,6 +267,9 @@ class SyncTest(unittest.TestCase):
             self.assertEqual(st["label"], "Online, all synced")
             recs = FakeSync.received[-1]["records"]
             self.assertEqual((len(recs["sales"]), len(recs["shifts"])), (15, 1))
+            self.assertEqual((len(recs["expenses"]), len(recs["pumps"]), len(recs["totalizer_readings"])), (2, 1, 2))
+            opening = [r for r in recs["totalizer_readings"] if r["kind"] == "open"][0]
+            self.assertEqual((opening["amount"], opening["volume"]), ("775397", "13508"))
             call(s.base, "/api/sales", {"fuel_type": "Diesel", "amount_pesos": "500", "price_per_liter": "57.40"})
             srv.shutdown()
             srv.server_close()
