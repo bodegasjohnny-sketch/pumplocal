@@ -75,6 +75,7 @@ Times are git commit times converted to PHT (UTC+8), from `git log`. Several com
 | 4:49 PM | **Shift Closing Slip:** printable one-page slip (`/closing-slip`), synthetic filled samples, `slipparse.py` (code reads every line), Cash tab "Scan closing slip" → review (new vs already saved, discount check, missing values highlighted) → confirm saves only new items and runs the cash check. Gemma only if OCR fails, and only to transcribe | `f5e5fa7` | 124 |
 | 4:49 PM | **Ask fix from my test:** a correct answer was followed by "Hindi masasagot ng datos ang tanong nang eksakto." The prompt now asks for 1–2 sentences, no disclaimers, and "can't answer" only when the number is truly missing; code drops a trailing can't-answer sentence after a real answer | `1cc152e` | 129 |
 | 5:00 PM | **Demo Day flow:** `seed.py --demo-empty` (empty shift, float, prices and the real 775397 opening preset), two synthetic Diesel 2 closing totalizer screens, slip numbers aligned to the demo, [DEMO_SCRIPT.md](DEMO_SCRIPT.md) (full + 3-minute stage version) and an end-to-end test of that exact click order | see git log | 131 |
+| 5:15 PM | **Switched demo to real JCB pump prices as of Oct 9, 2026** (Premium ₱85.90, Unleaded ₱85.40, Diesel ₱94.50): seed (default and `--demo-empty`), every synthetic sample image (meters, receipt, closing totalizers, closing slip, closing sheet) regenerated with liters × price = amount (rounded half-up), OCR fixtures, tests, DEMO_SCRIPT and README screenshots. Backup tag `demo-v1-before-real-prices` | see git log | 131 |
 
 ## Key design decisions
 

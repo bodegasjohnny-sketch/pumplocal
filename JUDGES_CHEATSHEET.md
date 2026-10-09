@@ -81,7 +81,7 @@ percent       = difference ÷ expected × 100
 - Sales are added up **by fuel type**: liters, and **gross** pesos, because the pump doesn't know about discounts.
 - **`core.gap_check`**: gap = pump − recorded. Within the tolerance (default **0.5 %** of dispensed) it's OK. Above it, it's **UNACCOUNTED** (red). Below it, **OVER_RECORDED** (a duplicate sale or misread).
 - **`core.price_check`**: implied price = pesos ÷ liters. It must match the posted price within **±₱0.05/L**, or fall inside the old–new range if "price changed this shift" was set. **A miss is a yellow warning only, never a theft flag.**
-- Example from the demo data: the pump shows 181 L / ₱10,390, recorded sales are 174.216 L / ₱10,000, so **6.784 L / ₱390 (3.75 %) unaccounted**, and the implied price is ₱57.40/L, which passes.
+- Example from the demo data (real JCB prices as of Oct 9, 2026): the pump shows 105 L / ₱9,922, recorded sales are 101 L / ₱9,544.50, so **4 L (3.81 %) / ₱377.50 (3.80 %) unaccounted**, and the implied price is ₱94.50/L, which passes. Demo Day flow (`--demo-empty`): 0.836 L / ₱79.00 (2.61 %) unaccounted on Diesel 2, cash SHORT ₱50.00.
 
 ## 4. Where data lives
 
