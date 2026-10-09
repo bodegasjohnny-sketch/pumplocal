@@ -29,7 +29,7 @@ photo's value; liter 13508). No sales, expenses, credit or cash checks.
 
 | # | Tap sample | Expected after the read | Do |
 |---|---|---|---|
-| 1 | `meter_premium.png` | Premium · 12.000 L × ₱85.90 = ₱1,030.80 | Type **20** in Discount, Reason **Senior**, Save |
+| 1 | `meter_premium.png` | Premium · 12.000 L × ₱85.90 = ₱1,030.80 | Save (no need to type the ₱20 senior discount: it is on the closing slip, step 7) |
 | 2 | `meter_unleaded.png` | Unleaded · 6.000 L × ₱85.40 = ₱512.40 | Save |
 | 3 | `receipt_diesel.png` | Diesel · 21.164 L × ₱94.50 = ₱2,000.00 | Save |
 
@@ -48,8 +48,8 @@ slip's credit sale is saved in step 8.
 
 | # | Do | Expected |
 |---|---|---|
-| 7 | **Scan closing slip** → sample `closing_slip_photo.jpg` | Float ₱1,000.00 · Expenses: Ice and water ₱60.00, Nozzle o-ring ₱350.00 (both **＋ new**) · Discounts ₱20.00 (**matches** the 20 typed in step 1) · Credit: Mang Ben, Diesel ₱945.00 (**＋ new**) · GCash ₱500.00 + Card ₱300.00 = non-cash ₱800.00 · Cash counted ₱3,263.20. Nothing highlighted as missing. |
-| 8 | **Confirm** | Saves 2 expenses + 1 credit sale (Diesel at ₱94.50 → 10.000 L), then runs the cash check |
+| 7 | **Scan closing slip** → sample `closing_slip_photo.jpg` | Float ₱1,000.00 · Expenses: Ice and water ₱60.00, Nozzle o-ring ₱350.00 (both **＋ new**) · Discounts: slip ₱20.00 · saved on sales ₱0.00 → **＋ ₱20.00 from the slip will be counted** · Credit: Mang Ben, Diesel ₱945.00 (**＋ new**) · GCash ₱500.00 + Card ₱300.00 = non-cash ₱800.00 · Cash counted ₱3,263.20. Nothing highlighted as missing. |
+| 8 | **Confirm** | Saves 2 expenses + 1 credit sale (Diesel at ₱94.50 → 10.000 L) and the slip's ₱20.00 discount, then runs the cash check |
 
 **Cash result:** expected ₱3,313.20 = 1,000 float + 4,488.20 sales − 20 discount − 945 credit − 410 expenses − 800
 non-cash; declared ₱3,263.20 → **SHORT -₱50.00 (-1.51%)**.
@@ -60,19 +60,32 @@ Pump says ₱3,024.00 dispensed; recorded sales ₱2,945.00; ₱79.00 (2.61%) un
 
 **Shift totals:** 4 sales · ₱4,488.20 · 49.164 L.
 
-### Ask tab · four questions
+**Discount, either way:** if someone does type 20 / Senior on the Premium sale in step 1, the slip shows "✓ match"
+instead. The shift counts the larger of "typed on sales" and "on the slip", never both, so it's ₱20.00 and
+SHORT -₱50.00 in both cases. (Johnny's Oct 9 Mac run skipped typing it and got -₱70.00 before this fix.)
 
-Gemma words the answer; the numbers must be these (with MOCK_AI=1 the built-in templates answer word for word):
+### Ask tab · tap the five chips, then type one question
 
-| # | Question | Correct numbers |
+The five chip questions (and close matches in English or Tagalog) are answered **by code**, labeled
+"🧮 Computed by PumpLocal": exact numbers, instant, word for word as below. Gemma answers only free-form questions.
+
+| # | Tap chip | Answer (exact) |
 |---|---|---|
-| 9 | Magkano ang benta ng diesel ngayon? | ₱2,945.00 · 31.164 litro (2 benta: receipt + Mang Ben credit) |
-| 10 | What were total sales today? | ₱4,488.20 · 49.164 liters · 4 sales |
-| 11 | Is any diesel missing? | Yes: 0.836 L (2.61%) and ₱79.00 (2.61%) unaccounted on Diesel 2 |
-| 12 | May kulang ba sa cash? | Oo, kulang ₱50.00 (-1.51%); inaasahan ₱3,313.20, nabilang ₱3,263.20 |
+| 9 | Magkano ang benta ng diesel ngayon? | Ang benta ng Diesel ngayong shift ay ₱2,945.00 (31.164 L, 2 benta). |
+| 10 | What are total sales this shift? | Total sales this shift: ₱4,488.20 (49.164 L, 4 sales). |
+| 11 | Ilang litro ng Premium ang nabenta? | 12.000 L ang nabentang Premium ngayong shift (₱1,030.80, 1 benta). |
+| 12 | May kulang ba sa cash? | May kulang na ₱50.00 (-1.51%) ang cash. Bilangin ulit ang pera at tingnan ang GCash/card slips at mga benta na hindi pa naitala. (Inaasahan: ₱3,313.20, nabilang: ₱3,263.20.) |
+| 13 | May kulang ba sa diesel? | Oo. Ayon sa metro ng pump, 32 L ang nailabas; 31.164 L ang naitalang benta; 0.836 L (2.61%) ang hindi naitala. Ayon sa metro ng pump, ₱3,024.00 ang nailabas; ₱2,945.00 ang naitalang benta; ₱79.00 (2.61%) ang hindi naitala. Lampas sa 0.5% na palugit. |
 
-If an answer shows "⚠ numbers not in the data", say so: that is the guard working, and the numbers on the Cash and
-Pump tabs are the source of truth.
+Typed English versions give the same numbers, e.g. "What were total sales today?" → Total sales this shift: ₱4,488.20 (49.164 L, 4 sales).
+and "Is any diesel missing?" → Yes. Pump says 32 L dispensed; recorded sales 31.164 L; 0.836 L (2.61%) unaccounted. Pump says ₱3,024.00 dispensed; recorded sales ₱2,945.00; ₱79.00 (2.61%) unaccounted. Over the 0.5% tolerance.
+
+| # | Type (free-form, answered live by Gemma) | What a good answer says |
+|---|---|---|
+| 14 | Bakit hindi tugma ang diesel? (or: Why does the diesel not match?) | Labeled "🤖 Local AI (gemma3:4b) · numbers from PumpLocal". It should explain that the pump gave out more diesel than was recorded: 0.836 L / ₱79.00 (2.61%), price check OK, so look for an unrecorded sale or credit fill-up. Wording varies; any number it uses must be in the shift data, otherwise a ⚠ Check note appears. |
+
+Gemma sees only the computed totals and the fuel dispensed this shift (e.g. "dispensed this shift 32 L and ₱3,024.00"),
+never the raw counter readings. Give it 5–20 s on the 8 GB Mac; if it is slow, the chips above still answer instantly.
 
 ---
 
@@ -85,8 +98,8 @@ closings). Leave the Pump tab open. On stage you only show real-photo reading, t
 |---|---|---|
 | 0:00–0:30 | Problem (one sentence) | "At the end of every shift, the owner can't tell if fuel or cash is missing, and the station has weak internet." |
 | 0:30–1:15 | Pump tab → tap the **REAL** photo `real_totalizer_diesel2.png` → Save | Reads **775397**, Diesel 2, Opening, in about 2 seconds, offline. Diesel row: **32 L / ₱3,024.00** dispensed vs 21.164 L / ₱2,000.00 recorded so far (the credit sale comes from the slip). |
-| 1:15–2:15 | Cash tab → **Scan closing slip** → `closing_slip_photo.jpg` → **Confirm** | Every line read, credit + expenses marked new, discount matches. Result: expected ₱3,313.20, counted ₱3,263.20 → **SHORT -₱50.00 (-1.51%)**. Pump tab now: 0.836 L (2.61%) / ₱79.00 unaccounted. |
-| 2:15–2:45 | Ask → **"May kulang ba sa cash?"** | "May kulang na ₱50.00 (-1.51%) ang cash … (Inaasahan: ₱3,313.20, nabilang: ₱3,263.20)" |
+| 1:15–2:15 | Cash tab → **Scan closing slip** → `closing_slip_photo.jpg` → **Confirm** | Every line read; credit, expenses and the ₱20 discount marked new. Result: expected ₱3,313.20, counted ₱3,263.20 → **SHORT -₱50.00 (-1.51%)**. Pump tab now: 0.836 L (2.61%) / ₱79.00 unaccounted. |
+| 2:15–2:45 | Ask → tap **"May kulang ba sa cash?"** | Instant, "🧮 Computed by PumpLocal": "May kulang na ₱50.00 (-1.51%) ang cash … (Inaasahan: ₱3,313.20, nabilang: ₱3,263.20.)" |
 | 2:45–3:00 | Close | "All math is code, the AI only reads and explains. ₱0 monthly cloud." |
 
 **If something goes wrong on stage:** a read that looks off → type the number (the form is always editable); the Ask

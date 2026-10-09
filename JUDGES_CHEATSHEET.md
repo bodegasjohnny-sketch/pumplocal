@@ -44,7 +44,11 @@ Plain-English notes on how PumpLocal really works, taken from the code in this r
 - **`core.slip_compare`** marks each expense/credit "✓ saved" (same amount already recorded; credit also needs a shared name word) or "＋ new", checks the discount total against the discounts typed on sales, and previews the expected cash. **`core.slip_apply`** (Confirm) saves only the new items, so pressing it twice saves nothing more; then the normal cash check runs.
 - Gemma is used only if OCR fails, and only to **transcribe** the lines as JSON; the same code parses them.
 
-**Ask answers:** the prompt asks for 1–2 sentences in the user's language, using only the DATA numbers, no disclaimers, and "can't answer" only when the number is truly missing. **`ai.strip_cant_answer`** removes a trailing "Hindi masasagot…"/"can't answer" sentence when the answer already uses a DATA number (seen in my test, after a correct answer).
+**Ask: fixed questions in code, free-form to Gemma.** **`ai.code_answer`** answers the five chip questions and close matches in English or Tagalog (sales of a fuel, total sales, liters of a fuel, cash short/over, missing fuel at the pump, plus credit, expenses and discounts) from code templates with the exact computed numbers, in the question's language, labeled "🧮 Computed by PumpLocal". It's instant and never calls the model. This came from my Oct 9 live Mac test: gemma3:4b read the raw counter 13540 as liters, wrote "49,164 liters" for 49.164 L, and answered "Isa. 1 sales" for Premium liters. Only free-form questions (e.g. "Bakit hindi tugma ang diesel?") go to Gemma, and its data now has only the fuel dispensed this shift (e.g. "32 L and ₱3,024.00"), never the raw totalizer readings; liters are written as "49.164 L".
+
+**Discounts from the closing slip:** on Confirm, the slip's discount total is saved for the shift, and the shift counts the **larger** of "typed on sales" and "on the slip", never the sum (`core.shift_summary`). So the ₱20 is counted once whether it was typed on the Premium sale, written on the slip, or both. My Oct 9 Mac run (not typed on the sale) showed −₱70.00 before this fix; now −₱50.00.
+
+**Free-form Ask answers (Gemma):** the prompt asks for 1–2 sentences in the user's language, using only the DATA numbers, no disclaimers, and "can't answer" only when the number is truly missing. **`ai.strip_cant_answer`** removes a trailing "Hindi masasagot…"/"can't answer" sentence when the answer already uses a DATA number (seen in my test, after a correct answer).
 
 **Demo Day:** `python3 seed.py --demo-empty`, then follow [DEMO_SCRIPT.md](DEMO_SCRIPT.md). `tests/test_demo_script.py` replays that click order and checks every number in the script.
 
@@ -137,11 +141,14 @@ percent       = difference ÷ expected × 100
 8. **"Is the data secure?"**
    It stays on the station's computer. Sync has **no authentication yet**, and there's **no receiving server** in this repo; `SYNC_URL` must point to an endpoint you control. There are no user logins, and the SQLite file isn't encrypted. All of these are on the to-do list.
 
-9. **"Who wrote the code?"**
+9. **"Where's the AI?"**
+   Two places, both local. (1) **Reading photos:** Apple Vision OCR reads meters, receipts, totalizers and the closing slip, with Gemma 3 4B as the fallback reader. (2) **Free-form chat:** typed questions like "Bakit hindi tugma ang diesel?" are answered by Gemma from the shift's computed numbers. The fixed questions (the chips) are answered by code on purpose, for accuracy: when I tested on my Mac, Gemma garbled some numbers. All the math is always code.
+
+10. **"Who wrote the code?"**
    Grok Bot, an AI coding assistant, wrote essentially all of it from my direction. I supplied the station's real problems and photos, tested on my Mac, and made the decisions. Devin was tried but had no credits left, so it wrote nothing. Claude only helped clean up my Mac. All of this is in `BUILD_LOG.md`.
 
-10. **"How do you know it works?"**
-    There are 131 automated tests (`MOCK_AI=1 python3 -m unittest discover -s tests`). They start the real server, call every endpoint, and test the parsers, the math, sync (with a fake server), a fake Ollama, and Ollama being down. **Caveat:** the tests run on Linux, so Apple Vision itself is replaced by a stand-in that returns recorded OCR text. The real Vision path has only been tried by hand on my Mac.
+11. **"How do you know it works?"**
+    There are 135 automated tests (`MOCK_AI=1 python3 -m unittest discover -s tests`). They start the real server, call every endpoint, and test the parsers, the math, sync (with a fake server), a fake Ollama, and Ollama being down. **Caveat:** the tests run on Linux, so Apple Vision itself is replaced by a stand-in that returns recorded OCR text. The real Vision path has only been tried by hand on my Mac.
 
 ### If they push further
 
