@@ -1,0 +1,383 @@
+{
+ "width": 1600,
+ "height": 1324,
+ "engine": "tesseract (stand-in for Apple Vision)",
+ "lines": [
+  {
+   "text": "DATE [09 OCT 2026 SHORT 37.90 MACHINE 1 UNLEADED SALES ACTUAL COLLECTIONS",
+   "confidence": 0.787,
+   "x": 0.1,
+   "y": 0.0604,
+   "w": 0.8681,
+   "h": 0.0091
+  },
+  {
+   "text": "SHIFT |6:00 AM - 2:00 PM OVER PUMP PRICE: 80.35 Mc: 8,729.22) | MA:",
+   "confidence": 0.785,
+   "x": 0.0963,
+   "y": 0.0748,
+   "w": 0.7762,
+   "h": 0.0189
+  },
+  {
+   "text": "PUMP ATTENDANT PREV VOLUME: 4682.47 Vv. 108.64 | | BILLS:",
+   "confidence": 0.817,
+   "x": 0.0369,
+   "y": 0.0899,
+   "w": 0.8456,
+   "h": 0.0227
+  },
+  {
+   "text": "VOLUME: 4791.11) | Ma: COINS:",
+   "confidence": 0.56,
+   "x": 0.5556,
+   "y": 0.108,
+   "w": 0.3306,
+   "h": 0.0227
+  },
+  {
+   "text": "PETTY CASH IN PETTY CASH OUT (EXP + COLL)",
+   "confidence": 0.952,
+   "x": 0.1,
+   "y": 0.1239,
+   "w": 0.3488,
+   "h": 0.0091
+  },
+  {
+   "text": "MONEY ALL: 385210 c BILLS DIFF:",
+   "confidence": 0.863,
+   "x": 0.5431,
+   "y": 0.1329,
+   "w": 0.36,
+   "h": 0.0091
+  },
+  {
+   "text": "1: 50 50 a: 25, 25,",
+   "confidence": 0.717,
+   "x": 0.0587,
+   "y": 0.139,
+   "w": 0.4269,
+   "h": 0.0181
+  },
+  {
+   "text": "a a0 = aa 7a COIN: e B: COINS DIFF:",
+   "confidence": 0.503,
+   "x": 0.1031,
+   "y": 0.1511,
+   "w": 0.8037,
+   "h": 0.0181
+  },
+  {
+   "text": "25 250 10: 22 220 —— eese18",
+   "confidence": 0.712,
+   "x": 0.1031,
+   "y": 0.1692,
+   "w": 0.59,
+   "h": 0.0181
+  },
+  {
+   "text": "5 100 20: 18 360 MACHINE 2 DIESEL SALES ACTUAL COLLECTIONS",
+   "confidence": 0.938,
+   "x": 0.1062,
+   "y": 0.1956,
+   "w": 0.8619,
+   "h": 0.0098
+  },
+  {
+   "text": "50: 20 1,000 50: 27 1,350 PUMP PRICE: 79.85|{ Mc: 18,482.88 | | ma:",
+   "confidence": 0.718,
+   "x": 0.0531,
+   "y": 0.2062,
+   "w": 0.8194,
+   "h": 0.0227
+  },
+  {
+   "text": "10% 20 2,000 100: 40 4,000 PREV VOLUME: 3871.29 Vv: 231.47| (Bis:",
+   "confidence": 0.779,
+   "x": 0.0475,
+   "y": 0.2243,
+   "w": 0.835,
+   "h": 0.0227
+  },
+  {
+   "text": "20 200: 6 1,200 VOLUME: 4102.76| | Ma: COINS:",
+   "confidence": 0.822,
+   "x": 0.0469,
+   "y": 0.2424,
+   "w": 0.8394,
+   "h": 0.0227
+  },
+  {
+   "text": "500: 500: 21 10,500 MONEY ALL: 327645 cs BILLS DIFF:",
+   "confidence": 0.885,
+   "x": 0.0469,
+   "y": 0.2674,
+   "w": 0.8562,
+   "h": 0.0113
+  },
+  {
+   "text": "1000: 1000: 34 34,000 COIN: e B: COINS DIFF:",
+   "confidence": 0.779,
+   "x": 0.0413,
+   "y": 0.2787,
+   "w": 0.8656,
+   "h": 0.0227
+  },
+  {
+   "text": "CASH TOTAL: 3,500.00 ‘CASH TOTAL: 51,725.00 BANK: 327645",
+   "confidence": 0.881,
+   "x": 0.0806,
+   "y": 0.3006,
+   "w": 0.6125,
+   "h": 0.0181
+  },
+  {
+   "text": "FT aEXEENSES 725.00 MACHINE 3 PREMIUM SALES ACTUAL COLLECTIONS",
+   "confidence": 0.74,
+   "x": 0.0988,
+   "y": 0.3301,
+   "w": 0.8694,
+   "h": 0.0128
+  },
+  {
+   "text": "AMOUNT DETAILS / NAME SIGNATURE PUMP PRICE: 81.95 Mc: 15,354.15 | | MA:",
+   "confidence": 0.801,
+   "x": 0.0469,
+   "y": 0.3437,
+   "w": 0.8256,
+   "h": 0.0196
+  },
+  {
+   "text": "220.00|REBATES - FLEET DISC 1.00/L x 220L EREVVOEURIED 27302.54 ME 187.36) | BILLS:",
+   "confidence": 0.716,
+   "x": 0.0756,
+   "y": 0.3625,
+   "w": 0.8069,
+   "h": 0.0234
+  },
+  {
+   "text": "60.00/ICE (2 BAGS) VOLUME: 17489.90|| Ma: COINS:",
+   "confidence": 0.859,
+   "x": 0.0819,
+   "y": 0.3837,
+   "w": 0.8044,
+   "h": 0.0144
+  },
+  {
+   "text": "100.00|LOAD - STATION PHONE MONEY ALL: 1433318 cd BILLS DIFF:",
+   "confidence": 0.862,
+   "x": 0.0756,
+   "y": 0.4018,
+   "w": 0.8275,
+   "h": 0.0136
+  },
+  {
+   "text": "145.00 | CLEANING SUPPLIES (ZONROX, RAGS) COIN: 8 B: COINS DIFF:",
+   "confidence": 0.653,
+   "x": 0.0756,
+   "y": 0.4199,
+   "w": 0.8313,
+   "h": 0.0196
+  },
+  {
+   "text": "200.00|CASH ADVANCE - ATTENDANT BAN REEDS",
+   "confidence": 0.618,
+   "x": 0.0756,
+   "y": 0.4381,
+   "w": 0.6175,
+   "h": 0.0136
+  },
+  {
+   "text": "MACHINE 4 PREMIUM SALES ACTUAL COLLECTIONS",
+   "confidence": 0.958,
+   "x": 0.5419,
+   "y": 0.4645,
+   "w": 0.4269,
+   "h": 0.0076
+  },
+  {
+   "text": "725.00 | TOTAL PUMP PRICE: 81.95|| Mc: 11,651.65 | Ma:",
+   "confidence": 0.789,
+   "x": 0.0756,
+   "y": 0.4758,
+   "w": 0.7969,
+   "h": 0.0219
+  },
+  {
+   "text": "EX EENSESTOUNSIO EGRET PREV VOLUME: 4196.62 Vv: 142.18 | [BiLis:",
+   "confidence": 0.57,
+   "x": 0.1762,
+   "y": 0.4932,
+   "w": 0.7063,
+   "h": 0.0242
+  },
+  {
+   "text": "NAME ‘AMOUNT DETAILS SIGNATURE VORIME: oS 58286 AR: COINS!",
+   "confidence": 0.501,
+   "x": 0.0706,
+   "y": 0.5159,
+   "w": 0.8156,
+   "h": 0.0242
+  },
+  {
+   "text": "MONEY ALL: 355541 e BILLS DIFF:",
+   "confidence": 0.784,
+   "x": 0.5431,
+   "y": 0.5363,
+   "w": 0.36,
+   "h": 0.0091
+  },
+  {
+   "text": "COIN: 0 B: COINS DIFF:",
+   "confidence": 0.762,
+   "x": 0.57,
+   "y": 0.5544,
+   "w": 0.3369,
+   "h": 0.0091
+  },
+  {
+   "text": "BANK: 355541",
+   "confidence": 0.957,
+   "x": 0.5681,
+   "y": 0.5695,
+   "w": 0.125,
+   "h": 0.0174
+  },
+  {
+   "text": "CASH RECONCILIATION",
+   "confidence": 0.92,
+   "x": 0.2019,
+   "y": 0.5876,
+   "w": 0.1075,
+   "h": 0.0083
+  },
+  {
+   "text": "TOTAL SALES (FUEL) 54,217.90 SUMMARY: PETTY CASH 3,500.00] TOTAL SALES 54,217.90",
+   "confidence": 0.872,
+   "x": 0.025,
+   "y": 0.5937,
+   "w": 0.9494,
+   "h": 0.0219
+  },
+  {
+   "text": "+ PETTY CASH IN (OPENING FLOAT) 3,500.00 COLLECTIONS",
+   "confidence": 0.912,
+   "x": 0.0256,
+   "y": 0.6231,
+   "w": 0.7506,
+   "h": 0.0106
+  },
+  {
+   "text": "- TOTAL EXPENSES, 725.00 TOTAL CASH + EXPENSES & COLLECTIONS 57,680.00",
+   "confidence": 0.92,
+   "x": 0.0256,
+   "y": 0.642,
+   "w": 0.9487,
+   "h": 0.0113
+  },
+  {
+   "text": "- COLLECTIONS (CHARGE / GCASH / CARD) 5,230.00 NAME AMOUNT DEBT DATE REMARKS.",
+   "confidence": 0.894,
+   "x": 0.0256,
+   "y": 0.6594,
+   "w": 0.8881,
+   "h": 0.0106
+  },
+  {
+   "text": "= EXPECTED CASH 51,762.90 FLEET ACCT A (CHARGE) 2,450.00| 09/10/26 | CREDIT - PAY 30 DAYS",
+   "confidence": 0.811,
+   "x": 0.0256,
+   "y": 0.676,
+   "w": 0.9019,
+   "h": 0.0189
+  },
+  {
+   "text": "ACTUAL CASH (PETTY CASH OUT) 51,725.00 GCASH 1,280.00 REF ...4821",
+   "confidence": 0.904,
+   "x": 0.025,
+   "y": 0.6956,
+   "w": 0.8488,
+   "h": 0.0121
+  },
+  {
+   "text": "OVER / (SHORT) (37.90) CARD (DEBIT) 1,500.00 APPROVAL 503318",
+   "confidence": 0.947,
+   "x": 0.0256,
+   "y": 0.7107,
+   "w": 0.8719,
+   "h": 0.0181
+  },
+  {
+   "text": "TOTAL 5,230.00",
+   "confidence": 0.962,
+   "x": 0.62,
+   "y": 0.7515,
+   "w": 0.1106,
+   "h": 0.0106
+  },
+  {
+   "text": "SALES SUMMARY",
+   "confidence": 0.968,
+   "x": 0.7044,
+   "y": 0.7802,
+   "w": 0.0806,
+   "h": 0.0076
+  },
+  {
+   "text": "PRODUCT _ [MACHINE SOLD (L)| MANUAL SOLD (L)| TOTAL SOLD INVENTORY.",
+   "confidence": 0.631,
+   "x": 0.5344,
+   "y": 0.7908,
+   "w": 0.425,
+   "h": 0.0227
+  },
+  {
+   "text": "UNLEADED 108.64 0.00 108.64",
+   "confidence": 0.926,
+   "x": 0.5144,
+   "y": 0.8157,
+   "w": 0.3663,
+   "h": 0.0091
+  },
+  {
+   "text": "DIESEL 231.47 0.00 231.47",
+   "confidence": 0.919,
+   "x": 0.5144,
+   "y": 0.8338,
+   "w": 0.3663,
+   "h": 0.0091
+  },
+  {
+   "text": "PREMIUM 329.54 0.00 329.54",
+   "confidence": 0.914,
+   "x": 0.5144,
+   "y": 0.852,
+   "w": 0.3663,
+   "h": 0.0091
+  },
+  {
+   "text": "OUTSOURCING PURCHASES.",
+   "confidence": 0.684,
+   "x": 0.6794,
+   "y": 0.8799,
+   "w": 0.1294,
+   "h": 0.0076
+  },
+  {
+   "text": "UNLEADED DIESEL PREMIUM VENDOR",
+   "confidence": 0.964,
+   "x": 0.5319,
+   "y": 0.8905,
+   "w": 0.3731,
+   "h": 0.0227
+  },
+  {
+   "text": "Attendant: Checked by:",
+   "confidence": 0.967,
+   "x": 0.0213,
+   "y": 0.9585,
+   "w": 0.5487,
+   "h": 0.0181
+  }
+ ]
+}

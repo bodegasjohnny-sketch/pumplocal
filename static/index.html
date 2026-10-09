@@ -492,7 +492,7 @@
     busy(true, "Reading photo on this computer… · Binabasa ang litrato…");
     $("overlaySub").textContent = state.reader === "gemma" || !state.vision
       ? "Gemma (" + state.model + ") is reading the photo. This can take a few minutes on a laptop."
-      : "Apple Vision OCR first (expected to take about a second). Gemma only if the numbers don't add up.";
+      : "Apple Vision OCR first (about 2 seconds on a MacBook Air). Gemma only if the numbers don't add up.";
     var body = { image: dataUrl }; if (full) body.image_full = full;
     api("/api/extract", body).then(function (j) {
       busy(false);
@@ -808,7 +808,7 @@
     busy(true, "Reading totalizer on this computer… · Binabasa ang metro…");
     $("overlaySub").textContent = state.reader === "gemma" || !state.vision
       ? "Gemma (" + state.model + ") is reading the photo. This can take a few minutes on a laptop."
-      : "Apple Vision OCR first (expected to take about a second). Gemma only if no Money/Volume number is found.";
+      : "Apple Vision OCR first (about 2 seconds on a MacBook Air). Gemma only if no Money/Volume number is found.";
     var body = { image: dataUrl }; if (full) body.image_full = full;
     var ready = state.pump ? Promise.resolve() : loadPump();
     Promise.all([api("/api/pump/extract", body), ready]).then(function (res) {

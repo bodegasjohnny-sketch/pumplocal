@@ -200,6 +200,35 @@ def parse(lines):
     return {"fields": fields, "consistent": bool(consistent), "found": found, "computed": computed, "notes": notes}
 
 
+# ---------------------------------------------------------------- guard: a whole report/sheet, not one sale
+# One pump display or one fuel receipt has a handful of numbers (the samples: 3-7) and well under 30 lines.
+# A daily sales / petty cash sheet has dozens of both, and guessing one "sale" out of it gives garbage
+# (e.g. 1.000 L x P79.85 = P80.35 built from two pump prices). So we stop instead of guessing.
+REPORT_WORDS = re.compile(r"\bREPORTS?\b|PETTY\s*CASH|SALES\s*SUMMARY|CASH\s*RECONCILIATION|\bRECONCILIATION\b|"
+                          r"\bINVENTORY\b|\bX-?READING\b|\bZ-?READING\b", re.I)
+REPORT_MAX_NUMBERS = 30
+REPORT_MAX_LINES = 40
+REPORT_MESSAGE = "This looks like a full report or sheet, not a pump screen or receipt. Snap one pump display or one receipt."
+REPORT_MESSAGE_TL = ("Mukhang buong report o sheet ito, hindi screen ng pump o resibo. "
+                     "Kunan ng litrato ang isang pump display o isang resibo.")
+
+
+def report_reason(lines):
+    """None for a single pump display / receipt; otherwise a short reason why the OCR text looks like a
+    multi-line report or table (keywords, or far too many numbers or lines)."""
+    texts = [(ln.get("text") or "").strip() for ln in (lines or [])]
+    texts = [t for t in texts if t]
+    words = sorted({m.group(0).upper() for t in texts for m in REPORT_WORDS.finditer(t)})
+    if words:
+        return "report keywords: %s" % ", ".join(words[:4])
+    n = sum(len(numbers_in(t)) for t in texts)
+    if n > REPORT_MAX_NUMBERS:
+        return "%d numbers found (one sale has only a few)" % n
+    if len(texts) > REPORT_MAX_LINES:
+        return "%d lines of text" % len(texts)
+    return None
+
+
 def _search(nums, A, L, P):
     """Find (amount, liters, price) among the numbers with liters x price = amount (within 1%).
     Prefers combinations that keep the most label-matched values."""

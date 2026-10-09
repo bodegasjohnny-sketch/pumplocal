@@ -247,6 +247,15 @@ def _vision_result(p, lines, seconds):
             "reader": "vision", "source": VISION_SOURCE, "consistent": p["consistent"]}
 
 
+def _report_result(lines, why, seconds):
+    return {"ok": False, "not_single": True, "reason": why,
+            "fields": {"fuel_type": "", "liters": None, "price_per_liter": None, "amount_pesos": None},
+            "raw": "\n".join(ln.get("text", "") for ln in lines)[:500], "notes": [], "warnings": [],
+            "message": meterparse.REPORT_MESSAGE + " · " + meterparse.REPORT_MESSAGE_TL,
+            "message_en": meterparse.REPORT_MESSAGE, "message_tl": meterparse.REPORT_MESSAGE_TL,
+            "seconds": round(seconds, 1), "reader": "vision", "source": VISION_SOURCE}
+
+
 def read_photo(image, image_full=None):
     """Photo -> fields. READER=auto: Apple Vision OCR + code parsing first; Gemma only if OCR is
     unavailable or its numbers don't add up. READER=vision: OCR only. READER=gemma: Gemma only."""
@@ -257,6 +266,9 @@ def read_photo(image, image_full=None):
         try:
             data, suffix = _decode_image(image_full or image)
             lines = vision.run_image_bytes(data, suffix)
+            why = meterparse.report_reason(lines)
+            if why:  # a whole closing sheet / report: don't guess a sale, and don't hand it to Gemma either
+                return _report_result(lines, why, time.time() - t0)
             p = meterparse.parse(lines)
             res = _vision_result(p, lines, time.time() - t0)
             if p["consistent"] or reader == "vision":

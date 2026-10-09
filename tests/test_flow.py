@@ -375,6 +375,27 @@ class PhotoReaderPipelineTest(unittest.TestCase):
         finally:
             s.stop()
 
+    def test_full_closing_sheet_is_refused_without_gemma(self):
+        """Johnny's bug: the whole closing sheet gave a 'sale' of 1.000 L x P79.85 = P80.35. Now: clear message,
+        empty fields, and no Gemma fallback (READER=auto and READER=vision)."""
+        for reader in ("auto", "vision"):
+            s = self.server(READER=reader, FAKE_OCR_JSON=os.path.join(FIXTURES, "closing_sheet_photo.json"))
+            try:
+                before = FakeOllama.image_chats
+                code, ex = call(s.base, "/api/extract", {"image": image_b64(), "image_full": image_b64()})
+                self.assertEqual(code, 200)
+                self.assertEqual((ex["ok"], ex["not_single"], ex["reader"]), (False, True, "vision"))
+                self.assertEqual(ex["fields"], {"fuel_type": "", "liters": None, "price_per_liter": None,
+                                                "amount_pesos": None})
+                self.assertIn("This looks like a full report or sheet, not a pump screen or receipt. "
+                              "Snap one pump display or one receipt.", ex["message"])
+                self.assertIn("Kunan ng litrato ang isang pump display o isang resibo.", ex["message"])
+                self.assertNotIn("fallback_reason", ex)
+                time.sleep(0.2)
+                self.assertEqual(FakeOllama.image_chats - before, 0, "Gemma must not read a full report")
+            finally:
+                s.stop()
+
     def test_auto_falls_back_to_gemma_when_inconsistent(self):
         s = self.server(FAKE_OCR_JSON=self.bad_json)
         try:
