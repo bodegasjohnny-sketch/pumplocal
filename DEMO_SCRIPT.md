@@ -132,7 +132,7 @@ the Pump tab open. On stage you show the real Premium 3 photos, the slip and one
 
 | Time | Do | Say / expected on screen |
 |---|---|---|
-| 0:00–0:30 | Problem (one sentence) | "At the end of every shift, the owner can't tell if fuel or cash is missing, and the station has weak internet." |
+| 0:00–0:30 | Problem (one sentence) | "In the provinces, brownouts are frequent and long, and the internet signal is weak. When the power or the signal goes, cloud apps stop, and fuel and cash gaps go unchecked." |
 | 0:30–1:30 | Pump tab → Premium 3 card: **📷 Opening photo** → pick `premium3_opening_shift_pesos.png` → Save; again with `premium3_opening_shift_liters.png`; then **📷 Closing photo** with `premium3_closing_shift_pesos.png` and `premium3_closing_shift_liters.png`, Save each (steps 4–7) | Each REAL photo reads in about 2 seconds, offline: 2559778 / 32333.73 → 2595535 / 32749.80. Red: **2.57 L (0.62%) / ₱237.35 (0.66%) unaccounted**; price check OK ₱85.94 vs ₱85.90. Say: "Pump readings: real photos. Sales: sample data. Gap is a demo, not a real station shortage." |
 | 1:30–2:15 | Cash tab → **Scan closing slip** → `closing_slip_photo.jpg` → **Confirm** | Every line read; credit, expenses and the ₱20 discount marked new. Result: expected ₱39,219.55, counted ₱39,169.55 → **SHORT -₱50.00 (-0.13%)**. |
 | 2:15–2:45 | Ask → tap **"May kulang ba sa premium?"** | Instant, "🧮 Computed by PumpLocal": "Oo. Ayon sa metro ng pump, 416.07 L ang nailabas; 413.5 L ang naitalang benta; 2.57 L (0.62%) ang hindi naitala. …" |
@@ -143,3 +143,31 @@ landed in the wrong box → tap ⇄ Swap (opening/closing) or ⇄ Move (pesos/li
 liters?" → tap ₱ Pesos or L Liters; to see what the camera read → open "OCR text" under the result; picked the wrong file → upload the right one with the same button (it
 replaces that side); the Ask answer is slow → the Pump tab already shows the gap; no Ollama → photos
 still read with Apple Vision.
+
+---
+
+## Demo video script (final)
+
+Final narration for the demo video, 18 beats, read in order. Numbers are spelled out for the voiceover; on screen
+they match the steps above (2.57 L unaccounted on Premium 3, cash SHORT ₱50.00).
+
+| Beat | Narration |
+|---|---|
+| 01 | Johnny joined the App Builders PH Hackathon twenty twenty-six. This is his demo. |
+| 02 | Before we begin, thank you to our sponsors: PC Express, AMD, ASUS, Cognition, Tutorials Dojo, PocketDevs, whitecloak, SM Supermalls, and PDAX. Thank you for making this event possible. |
+| 03 | In the provinces, brownouts are frequent and long, and internet signal is weak. When the power or the signal goes, cloud apps stop, and fuel and cash gaps go unchecked. |
+| 04 | Johnny runs a gas station in South Cotabato, so he built the fix. Let's see it. |
+| 05 | This is PumpLocal. An offline AI assistant for gas stations. |
+| 06 | First, Johnny switches off the Wi-Fi. The app runs on his MacBook Air with no internet connection. |
+| 07 | He opens a sample pump-meter photo. Apple Vision reads the numbers on the Mac itself, in about two seconds. He saves the reading. |
+| 08 | Next, he loads the opening and closing totalizer photos from his actual Premium Three pump. |
+| 09 | PumpLocal compares the fuel dispensed against the recorded sales. The result? |
+| 10 | Two point five seven liters unaccounted for. |
+| 11 | These are real pump photos. The sales figures are sample data for this demo. |
+| 12 | Now Johnny scans the closing cash slip and confirms it. PumpLocal flags another gap. |
+| 13 | Fifty pesos short. |
+| 14 | Finally, he asks in Tagalog why the Premium fuel is short. |
+| 15 | Gemma, running locally on the Mac, answers in Tagalog using this shift's numbers. The Wi-Fi is still off. |
+| 16 | At a station, a Mac mini and the Wi-Fi router run on one small UPS, so staff phones keep working through a brownout, with no internet needed. A laptop on battery plus a power bank for the router works too. |
+| 17 | From meter photos to fuel checks, cash checks, and answers. |
+| 18 | PumpLocal. When the power or the internet stops, the work doesn't. |

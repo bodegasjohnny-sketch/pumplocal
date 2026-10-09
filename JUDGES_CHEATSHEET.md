@@ -109,6 +109,8 @@ percent       = difference ÷ expected × 100
   - After a 2xx reply, those rows are marked `synced=1`.
   - If there's no `SYNC_URL`, or the server can't be reached, rows just wait, and the header's sync pill shows **"Cloud sync: Offline, N records queued"**. The badge above the bottom tabs, **"💻 Running on this Mac · no internet needed"**, is always on: everything except sync works offline.
 - **If Ollama is off:** OCR still reads photos on a Mac, cash and pump notes use templates, and Ask answers from the computed totals.
+- **The pain point:** in the provinces, brownouts are frequent and long and the internet signal is weak. When the power or the signal goes, cloud apps stop, so fuel and cash gaps go unchecked. PumpLocal needs neither.
+- **Station setup (proposed):** a **Mac mini** at the station runs PumpLocal and the AI, and **one small UPS powers both the Mac mini and the Wi-Fi router**, so staff phones keep working on the local Wi-Fi through a brownout, with no internet. A **laptop on battery plus a power bank for the router** also works. (The demo itself runs on a MacBook Air; the Mac mini + UPS setup is a proposal, not yet tested at the station.)
 
 ---
 
@@ -154,6 +156,9 @@ percent       = difference ÷ expected × 100
 
 12. **"Was Ollama or the model installed before the hackathon?"**
     No. Claude installed Ollama at 1:38 PM on Oct 9, and I pulled `gemma3:4b` at 2:14 PM, both after the 1:00 PM kickoff. The first PumpLocal commit was at 2:10 PM. The timeline is in `BUILD_LOG.md`.
+
+13. **"What happens in a brownout?"**
+    The laptop keeps running on its battery, and the Wi-Fi router needs a UPS or a power bank so staff phones stay connected to the local network (no internet needed). The proposed station setup is a Mac mini and the router on one small UPS, so staff phones keep working through a brownout. Everything is saved to SQLite as soon as it's entered, and sync just waits until the internet is back.
 
 ### If they push further
 

@@ -31,13 +31,15 @@
   .col { flex:1; }
   .slot { width:560px; height:620px; flex:none; border-radius:24px; overflow:hidden; position:relative;
     background:repeating-linear-gradient(-8deg,#fffdf4 0 46px,#c9d6ea 46px 48px); box-shadow:0 6px 30px rgba(11,37,69,.18); }
-  .slot img { width:100%; height:100%; object-fit:cover; display:block; }
-  .slot img[hidden] { display:none; }
-  .slot .ph { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; align-items:center;
-    gap:16px; filter:blur(.6px); color:#5a6b86; font:italic 34px "Bradley Hand","Segoe Print","Comic Sans MS",cursive; }
-  .slot .ph s { opacity:.55; }
   .slot .cap { position:absolute; left:0; right:0; bottom:0; background:rgba(11,37,69,.85); color:#fff;
     font:600 22px -apple-system,"Segoe UI",sans-serif; padding:14px 20px; filter:none; }
+  .slot.out { background:linear-gradient(160deg,#1b263b,#0b2545); display:flex; flex-direction:column; gap:22px;
+    padding:40px 36px 110px; }
+  .slot.out .ob { background:rgba(255,255,255,.08); border-left:10px solid var(--red); border-radius:18px; padding:18px 24px;
+    display:flex; flex-direction:column; color:#fff; position:relative; padding-left:110px; min-height:118px; justify-content:center; }
+  .slot.out .ob .oi { position:absolute; left:24px; top:50%; transform:translateY(-50%); font-size:58px; }
+  .slot.out .ob b { font-size:34px; }
+  .slot.out .ob p { font-size:24px; margin:6px 0 0; opacity:.75; }
   .tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:28px; width:100%; }
   .tile { background:#fff; border-radius:24px; padding:34px; box-shadow:0 4px 18px rgba(11,37,69,.10); border-top:10px solid var(--green); }
   .tile.r { border-top-color:var(--red); } .tile.y { border-top-color:var(--yellow); }
@@ -56,10 +58,14 @@
   .flow { display:flex; align-items:stretch; gap:0; width:100%; margin-top:10px; }
   .node { flex:1; background:#fff; border-radius:24px; padding:30px 26px; text-align:center;
     box-shadow:0 4px 18px rgba(11,37,69,.10); border-top:10px solid var(--navy2); }
-  .node.hub { border-top-color:var(--red); } .node.ups { border-top-color:var(--yellow); }
+  .node.hub { border-top-color:var(--red); }
   .node .ic { font-size:72px; line-height:1; }
   .node b { display:block; font-size:34px; color:var(--navy); margin:16px 0 10px; }
   .node p { font-size:24px; color:var(--muted); margin:0; line-height:1.3; }
+  .upsbar { display:flex; align-items:center; gap:26px; margin:22px 0 0 calc((100% - 128px) / 3 + 64px); background:#fff;
+    border-radius:20px; padding:20px 28px; border-left:12px solid var(--yellow); box-shadow:0 4px 18px rgba(11,37,69,.10); }
+  .upsbar .ic { font-size:60px; } .upsbar b { font-size:30px; color:var(--navy); display:block; }
+  .upsbar p { font-size:24px; color:var(--muted); margin:6px 0 0; }
   .link { width:64px; flex:none; display:flex; align-items:center; justify-content:center; font-size:40px; color:var(--navy2); }
   #nav { position:absolute; right:28px; bottom:20px; font-size:22px; color:var(--muted); }
   #hint { position:fixed; left:12px; bottom:8px; color:#8a97ad; font-size:12px; }
@@ -77,19 +83,20 @@
     </div>
     <div class="body">
       <div class="col">
-        <h1>The owner can't <em>see</em> the shift.</h1>
+        <h1>Power out, signal gone: <em>nobody</em> checks the shift.</h1>
         <ul>
-          <li data-i="🏠">Owner in Tagaytay</li>
+          <li data-i="⚡">Province brownouts: frequent and long</li>
+          <li data-i="📶">Weak internet signal</li>
+          <li data-i="☁️">Cloud apps stop when either goes</li>
+          <li data-i="❓">Fuel and cash gaps go unchecked</li>
           <li data-i="⛽">JCB Gas Station · Sto. Niño, South Cotabato</li>
-          <li data-i="📝">Handwritten closing sheets</li>
-          <li data-i="❓">Shortages nobody can explain</li>
-          <li data-i="📶">No reliable internet</li>
         </ul>
       </div>
-      <div class="slot" id="sheetSlot">
-        <img id="sheetImg" alt="Handwritten closing sheet (blurred)" hidden>
-        <div class="ph" id="sheetPh"><span>Closing — Diesel 2</span><s>████████</s><span>Opening ▒▒▒▒▒</span><span>Closing ▒▒▒▒▒</span><span>Cash ₱ ▒▒,▒▒▒</span><s>██████</s></div>
-        <div class="cap">Today: a handwritten sheet (blurred)</div>
+      <div class="slot out" id="outSlot">
+        <div class="ob"><div class="oi">⚡</div><b>Brownout</b><p>Power out for hours</p></div>
+        <div class="ob"><div class="oi">📶</div><b>No signal</b><p>Mobile data drops</p></div>
+        <div class="ob"><div class="oi">☁️</div><b>Cloud app: can't connect</b><p>Sales and cash not checked</p></div>
+        <div class="cap">Station owners in the provinces: the cloud stops when the power or the signal goes</div>
       </div>
     </div>
   </section>
@@ -109,18 +116,17 @@
 
   <!-- 3. How it runs at the station -->
   <section class="slide" data-n="3">
-    <div class="body" style="flex-direction:column;align-items:stretch;justify-content:center">
+    <div class="body" style="flex-direction:column;align-items:stretch;justify-content:center;gap:30px">
       <h1>How it runs <em>at the station</em></h1>
       <div class="flow">
-        <div class="node"><div class="ic">📱</div><b>Staff phones</b><p>Snap pump screens and receipts, log sales, do the closing count</p></div>
+        <div class="node"><div class="ic">📱</div><b>Staff phones</b><p>On their own batteries. Snap pump screens and receipts, log sales, do the closing count</p></div>
         <div class="link">⇄</div>
         <div class="node"><div class="ic">📶</div><b>Wi-Fi router</b><p>Local network only. No internet needed</p></div>
         <div class="link">⇄</div>
-        <div class="node hub"><div class="ic">🖥️</div><b>Mac mini</b><p>Used, M1, 8 GB or more. Always on. Runs PumpLocal and the AI</p></div>
-        <div class="link">+</div>
-        <div class="node ups"><div class="ic">🔋</div><b>UPS battery</b><p>Survives brownouts. Auto-restarts after a power failure</p></div>
+        <div class="node hub"><div class="ic">🖥️</div><b>Mac mini</b><p>Proposed for the station. Always on. Runs PumpLocal and the AI</p></div>
       </div>
-      <div class="foot">Shift data queues for the owner in Tagaytay and sends whenever any internet appears (owner view: next) · <b>one-time hardware, ₱0 monthly cloud.</b></div>
+      <div class="upsbar"><span class="ic">🔋</span><div><b>One small UPS: Mac mini + Wi-Fi router</b><p>Brownout? Staff phones keep working on the local Wi-Fi. No internet needed</p></div></div>
+      <div class="foot" style="margin-top:22px">Also works: a <b>laptop on battery</b> + a <b>power bank for the router</b> · syncs to the owner when internet returns</div>
     </div>
   </section>
 
@@ -180,10 +186,6 @@
     if (e.target.closest('a')) return;            // the demo button navigates
     show(e.clientX < window.innerWidth * 0.25 ? i - 1 : i + 1);
   });
-  // Optional real (blurred) photo: samples/handwritten_blurred.jpg. Falls back to the styled placeholder.
-  var img = document.getElementById('sheetImg');
-  img.onload = function () { img.hidden = false; document.getElementById('sheetPh').style.display = 'none'; };
-  img.src = '/samples/handwritten_blurred.jpg';
   window.addEventListener('resize', fit);
   fit();
   show((parseInt(location.hash.slice(1), 10) || 1) - 1);

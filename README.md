@@ -84,7 +84,8 @@ A database created before the Pump feature gets the Diesel 2 demo pump automatic
 Open **http://localhost:8080/slides**, or use the small "Slides" link in the app header. The deck is a single static page (`static/slides.html`) with no CDN or external fonts, so it works with Wi-Fi off. It has four short slides (Problem, Why local AI, How it runs at the station, What's next) and a final **"Go to live demo"** button that opens the app.
 
 - **Controls:** → / Space / click to advance, ← to go back, **F** for fullscreen. The deck is 16:9 and scales to any screen.
-- **Optional photo:** to show a blurred photo of a handwritten closing sheet on slide 1, save it as `samples/handwritten_blurred.jpg`. Blur all names and signatures first. Without the file, a styled placeholder is shown.
+- **Slide 1 (Problem):** province station owners face frequent, long brownouts and weak internet; when the power or the signal goes, cloud apps stop, so fuel and cash gaps go unchecked.
+- **Slide 3 (station setup):** the proposed setup is a Mac mini at the station with one small UPS powering both the Mac mini and the Wi-Fi router (see [Station setup](#station-setup-proposed)).
 
 ### Configuration (environment variables)
 
@@ -131,10 +132,21 @@ If Ollama isn't running, the app still works. On a Mac, photos are still read by
 
 ## Why local
 
-- **Outages:** brownouts and weak or dead mobile data are common, and a station can't stop recording sales when the internet drops.
+- **Outages:** in the provinces, brownouts are frequent and long, and the internet signal is weak. When the power or the signal goes, cloud apps stop, and fuel and cash gaps go unchecked. A station can't stop recording sales when that happens.
 - **Data privacy:** sales and cash figures stay on the station's own computer until the owner chooses to sync.
 - **Catch unrecorded sales, even offline:** the pump's own totalizer is compared with recorded sales on the station's computer, so an owner sees "4 L / ₱377.50 unaccounted" at shift end without any internet connection or cloud service.
 - **No per-call API costs:** fuel retail runs on thin margins, and a local model has no per-request fee.
+
+## Station setup (proposed)
+
+The demo runs on a MacBook Air. For day-to-day use at a station, the proposed setup is:
+
+- **Mac mini** (M1, 8 GB or more), always on, running PumpLocal and the local AI.
+- **Wi-Fi router** for the local network only. No internet needed.
+- **One small UPS powering both the Mac mini and the Wi-Fi router**, so staff phones (on their own batteries) keep working on the local Wi-Fi through a brownout, with no internet.
+- **Also works:** a laptop on its own battery plus a power bank for the router.
+
+Shift data queues on the station's computer and syncs to the owner when internet returns. This setup is a proposal; the demo was not run on a Mac mini or a UPS.
 
 ## AI usage & disclosures
 
@@ -182,7 +194,7 @@ tests/        Unit + end-to-end tests
 - Apple Vision OCR needs macOS. On Linux, photos are read by Gemma only.
 - One open shift at a time and one station per install. There are no user accounts or login.
 - The sync payload is a simple JSON batch with no authentication or receiving server included. `SYNC_URL` should point at an endpoint you control.
-- Closing slip: tested with typed (synthetic) digits only; real handwriting hasn't been tested. Expenses and credits are matched to saved ones by amount, so changing an amount in the review makes it a new item. Discounts are recorded per sale; on Confirm the slip's discount total is also kept for the shift, and the larger of the two counts (never both). That slip discount is a local setting, so it doesn't sync yet.
+- Closing slip: tested with typed (synthetic) digits only. Handwritten slips are not supported or tested. Expenses and credits are matched to saved ones by amount, so changing an amount in the review makes it a new item. Discounts are recorded per sale; on Confirm the slip's discount total is also kept for the shift, and the larger of the two counts (never both). That slip discount is a local setting, so it doesn't sync yet.
 - Language detection for answers is a simple Tagalog keyword heuristic.
 - Pump check: sales are matched to pumps by fuel type (sales don't record which nozzle), so pumps of the same fuel are compared as a group. A pump that rolls over past its maximum must be entered by hand. Pump readings sync like expenses, but the price-change and tolerance settings stay local. Credit sales are recorded with a customer name only. There's no utang ledger or payment tracking yet.
 
