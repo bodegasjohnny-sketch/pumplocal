@@ -74,7 +74,7 @@ A database created before the Pump feature gets the Diesel 2 demo pump automatic
 
 ### Pitch slides (offline)
 
-Open **http://localhost:8080/slides**, or use the small "Slides" link in the app header. The deck is a single static page (`static/slides.html`) with no CDN or external fonts, so it works with Wi-Fi off. It has three short slides (Problem, Why local AI, What's next) and a final **"Go to live demo"** button that opens the app.
+Open **http://localhost:8080/slides**, or use the small "Slides" link in the app header. The deck is a single static page (`static/slides.html`) with no CDN or external fonts, so it works with Wi-Fi off. It has four short slides (Problem, Why local AI, How it runs at the station, What's next) and a final **"Go to live demo"** button that opens the app.
 
 - **Controls:** → / Space / click to advance, ← to go back, **F** for fullscreen. The deck is 16:9 and scales to any screen.
 - **Optional photo:** to show a blurred photo of a handwritten closing sheet on slide 1, save it as `samples/handwritten_blurred.jpg`. Blur all names and signatures first. Without the file, a styled placeholder is shown.

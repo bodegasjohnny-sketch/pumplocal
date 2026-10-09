@@ -53,6 +53,14 @@
     padding:40px 90px; border-radius:40px; box-shadow:0 10px 40px rgba(255,183,3,.35); }
   .go:hover { filter:brightness(1.07); }
   .sub { font-size:30px; opacity:.8; margin-top:34px; }
+  .flow { display:flex; align-items:stretch; gap:0; width:100%; margin-top:10px; }
+  .node { flex:1; background:#fff; border-radius:24px; padding:30px 26px; text-align:center;
+    box-shadow:0 4px 18px rgba(11,37,69,.10); border-top:10px solid var(--navy2); }
+  .node.hub { border-top-color:var(--red); } .node.ups { border-top-color:var(--yellow); }
+  .node .ic { font-size:72px; line-height:1; }
+  .node b { display:block; font-size:34px; color:var(--navy); margin:16px 0 10px; }
+  .node p { font-size:24px; color:var(--muted); margin:0; line-height:1.3; }
+  .link { width:64px; flex:none; display:flex; align-items:center; justify-content:center; font-size:40px; color:var(--navy2); }
   #nav { position:absolute; right:28px; bottom:20px; font-size:22px; color:var(--muted); }
   #hint { position:fixed; left:12px; bottom:8px; color:#8a97ad; font-size:12px; }
   :fullscreen #hint { display:none; }
@@ -99,8 +107,25 @@
     </div>
   </section>
 
-  <!-- 3. What's next -->
+  <!-- 3. How it runs at the station -->
   <section class="slide" data-n="3">
+    <div class="body" style="flex-direction:column;align-items:stretch;justify-content:center">
+      <h1>How it runs <em>at the station</em></h1>
+      <div class="flow">
+        <div class="node"><div class="ic">📱</div><b>Staff phones</b><p>Snap pump screens and receipts, log sales, do the closing count</p></div>
+        <div class="link">⇄</div>
+        <div class="node"><div class="ic">📶</div><b>Wi-Fi router</b><p>Local network only. No internet needed</p></div>
+        <div class="link">⇄</div>
+        <div class="node hub"><div class="ic">🖥️</div><b>Mac mini</b><p>Used, M1, 8 GB or more. Always on. Runs PumpLocal and the AI</p></div>
+        <div class="link">+</div>
+        <div class="node ups"><div class="ic">🔋</div><b>UPS battery</b><p>Survives brownouts. Auto-restarts after a power failure</p></div>
+      </div>
+      <div class="foot">Owner in Tagaytay gets the shift summary whenever any internet appears · <b>one-time hardware, ₱0 monthly cloud.</b></div>
+    </div>
+  </section>
+
+  <!-- 4. What's next -->
+  <section class="slide" data-n="4">
     <div class="body" style="flex-direction:column;align-items:stretch;justify-content:center">
       <h1>What's <em>next</em></h1>
       <ul>
@@ -112,7 +137,7 @@
   </section>
 
   <!-- Final jump -->
-  <section class="slide jump" data-n="4">
+  <section class="slide jump" data-n="5">
     <div class="wifi">📴 Wi-Fi OFF</div><br>
     <a class="go" href="/" id="goDemo">Go to live demo →</a>
     <div class="sub">Everything you'll see runs on this laptop.</div>
