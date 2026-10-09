@@ -19,6 +19,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SAMPLE = os.path.join(ROOT, "samples", "meter_premium.png")
+FAKE_OCR = os.path.join(ROOT, "tests", "fake_ocr.py")
+FIXTURES = os.path.join(ROOT, "tests", "ocr_fixtures")
 
 
 def free_port():
@@ -62,6 +64,11 @@ class FakeSync(BaseHTTPRequestHandler):
 class FakeOllama(BaseHTTPRequestHandler):
     """Mimics Ollama's /api/tags and /api/chat with realistic messy model output."""
     last_chat = None
+    chats = 0
+    image_chats = 0  # photo reads only (the startup warm-up is a text chat)
+    tags_delay = 0.0  # seconds /api/tags stalls while a chat is running (like Ollama on an 8 GB Mac)
+    chat_delay = 0.0
+    active = 0
 
     def log_message(self, *a):
         pass
@@ -74,11 +81,21 @@ class FakeOllama(BaseHTTPRequestHandler):
         self.wfile.write(b)
 
     def do_GET(self):
+        if FakeOllama.active:
+            time.sleep(FakeOllama.tags_delay)
         self._send({"models": [{"name": "gemma3:4b"}]})
 
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         FakeOllama.last_chat = body
+        FakeOllama.chats += 1
+        if body["messages"][-1].get("images"):
+            FakeOllama.image_chats += 1
+        FakeOllama.active += 1
+        try:
+            time.sleep(FakeOllama.chat_delay)
+        finally:
+            FakeOllama.active -= 1
         msg = body["messages"][-1]
         if msg.get("images"):
             content = 'Here you go:\n{"fuel_type":"diesel","liters":"34.843","price_per_liter":"P57.40","amount_pesos":"2,000.00"}'
@@ -290,6 +307,152 @@ class RealAIPathTest(unittest.TestCase):
             self.assertEqual(saved["sale"]["amount_pesos"], "324.95")
         finally:
             s.stop()
+
+
+class PhotoReaderPipelineTest(unittest.TestCase):
+    """READER=auto|vision|gemma with a stand-in OCR program (OCR_BIN) and a fake Ollama."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.srv, cls.url = start_fake(FakeOllama)
+        cls.tmp = tempfile.mkdtemp()
+        cls.bad_json = os.path.join(cls.tmp, "bad.json")
+        with open(os.path.join(FIXTURES, "meter_premium.json")) as f:
+            d = json.load(f)
+        for ln in d["lines"]:
+            if ln["text"] == "15.387":
+                ln["text"] = "75.387"  # misread digit: liters x price no longer equals amount
+        with open(cls.bad_json, "w") as f:
+            json.dump(d, f)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.srv.shutdown()
+        cls.srv.server_close()
+
+    def server(self, **env):
+        base = dict(MOCK_AI="0", OLLAMA_URL=self.url, OCR_BIN=sys.executable)
+        base.update(env)
+        # OCR_BIN must be one program: run fake_ocr.py through a tiny wrapper script
+        wrapper = os.path.join(self.tmp, "ocr_wrapper.sh")
+        with open(wrapper, "w") as f:
+            f.write('#!/bin/sh\nexec "%s" "%s" "$@"\n' % (sys.executable, FAKE_OCR))
+        os.chmod(wrapper, 0o755)
+        base["OCR_BIN"] = wrapper
+        return Server(**base)
+
+    def test_auto_uses_vision_when_consistent(self):
+        s = self.server(FAKE_OCR_JSON=os.path.join(FIXTURES, "receipt_diesel.json"))
+        try:
+            before = FakeOllama.image_chats
+            code, ex = call(s.base, "/api/extract", {"image": image_b64(), "image_full": image_b64()})
+            self.assertEqual(code, 200)
+            self.assertEqual((ex["ok"], ex["source"], ex["reader"]), (True, "Apple Vision (on-device)", "vision"))
+            self.assertEqual(ex["fields"], {"fuel_type": "Diesel", "liters": "34.843", "price_per_liter": "57.40",
+                                            "amount_pesos": "2000.00"})
+            self.assertIsInstance(ex["seconds"], float)
+            self.assertNotIn("fallback_reason", ex)
+            time.sleep(0.2)
+            self.assertEqual(FakeOllama.image_chats - before, 0, "Gemma must not be called when OCR is consistent")
+            code, st = call(s.base, "/api/status")
+            self.assertEqual((st["reader"], st["vision"]["available"]), ("auto", True))
+        finally:
+            s.stop()
+
+    def test_auto_falls_back_to_gemma_when_inconsistent(self):
+        s = self.server(FAKE_OCR_JSON=self.bad_json)
+        try:
+            code, ex = call(s.base, "/api/extract", {"image": image_b64()})
+            self.assertEqual((ex["reader"], ex["source"]), ("gemma", "Gemma 3 4B via Ollama (gemma3:4b)"))
+            self.assertEqual(ex["fields"]["fuel_type"], "Diesel")  # what the fake Gemma says
+            self.assertIn("didn't add up", ex["fallback_reason"])
+        finally:
+            s.stop()
+
+    def test_auto_falls_back_when_ocr_errors(self):
+        s = self.server(FAKE_OCR_JSON="x", FAKE_OCR_FAIL="1")
+        try:
+            code, ex = call(s.base, "/api/extract", {"image": image_b64()})
+            self.assertEqual((code, ex["reader"]), (200, "gemma"))
+            self.assertIn("simulated failure", ex["fallback_reason"])
+        finally:
+            s.stop()
+
+    def test_reader_gemma_skips_ocr(self):
+        s = self.server(READER="gemma", FAKE_OCR_JSON=os.path.join(FIXTURES, "meter_premium.json"))
+        try:
+            code, ex = call(s.base, "/api/extract", {"image": image_b64()})
+            self.assertEqual((ex["reader"], ex["fields"]["fuel_type"]), ("gemma", "Diesel"))
+        finally:
+            s.stop()
+
+    def test_reader_vision_never_calls_gemma(self):
+        s = self.server(READER="vision", FAKE_OCR_JSON=self.bad_json)
+        try:
+            before = FakeOllama.image_chats
+            code, ex = call(s.base, "/api/extract", {"image": image_b64()})
+            self.assertEqual((ex["reader"], ex["consistent"]), ("vision", False))
+            self.assertIn("don't add up", ex["message"])
+            s2 = self.server(READER="vision", FAKE_OCR_JSON="x", FAKE_OCR_FAIL="1")
+            try:
+                code, ex = call(s2.base, "/api/extract", {"image": image_b64()})
+                self.assertEqual((ex["ok"], ex["reader"]), (False, "vision"))
+            finally:
+                s2.stop()
+            time.sleep(0.2)
+            self.assertEqual(FakeOllama.image_chats - before, 0)
+        finally:
+            s.stop()
+
+    def test_inconsistent_ocr_and_ollama_down_returns_ocr_values(self):
+        s = self.server(FAKE_OCR_JSON=self.bad_json, OLLAMA_URL="http://127.0.0.1:%d" % free_port())
+        try:
+            code, ex = call(s.base, "/api/extract", {"image": image_b64()})
+            self.assertEqual((code, ex["reader"], ex["fields"]["liters"]), (200, "vision", "75.387"))
+            self.assertTrue(any("Gemma fallback unavailable" in w for w in ex["warnings"]))
+        finally:
+            s.stop()
+
+    def test_vision_unavailable_on_linux_is_silent(self):
+        if sys.platform == "darwin":
+            self.skipTest("Linux-only check")
+        s = Server(MOCK_AI="1")
+        try:
+            code, ex = call(s.base, "/api/extract", {"image": image_b64()})
+            self.assertEqual(ex["reader"], "gemma")
+            self.assertNotIn("fallback_reason", ex)
+            code, st = call(s.base, "/api/status")
+            self.assertFalse(st["vision"]["available"])
+        finally:
+            s.stop()
+
+
+class StatusBusyTest(unittest.TestCase):
+    """While Gemma is working, a slow /api/tags must show "Local AI busy", not "Ollama not running"."""
+
+    def test_busy_during_inference(self):
+        srv, url = start_fake(FakeOllama)
+        s = Server(MOCK_AI="0", OLLAMA_URL=url, STATUS_TIMEOUT="0.4", STATUS_CACHE="0", READER="gemma")
+        try:
+            time.sleep(0.5)  # let the startup warm-up chat finish
+            FakeOllama.tags_delay, FakeOllama.chat_delay = 2.0, 2.5
+            code, st = call(s.base, "/api/status")
+            self.assertEqual((st["ai"]["ok"], st["ai"]["busy"], st["ai"]["detail"]), (True, False, "Local AI ready"))
+            t = threading.Thread(target=call, args=(s.base, "/api/ask", {"question": "Total sales?"}))
+            t.start()
+            time.sleep(0.5)
+            code, st = call(s.base, "/api/status")
+            self.assertEqual((st["ai"]["ok"], st["ai"]["busy"]), (True, True))
+            self.assertEqual(st["ai"]["detail"], "Local AI busy")
+            t.join()
+            time.sleep(0.1)
+            code, st = call(s.base, "/api/status")
+            self.assertEqual((st["ai"]["busy"], st["ai"]["detail"]), (False, "Local AI ready"))
+        finally:
+            FakeOllama.tags_delay = FakeOllama.chat_delay = 0.0
+            s.stop()
+            srv.shutdown()
+            srv.server_close()
 
 
 if __name__ == "__main__":

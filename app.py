@@ -15,6 +15,7 @@ import ai
 import core
 import seed
 import sync
+import vision
 
 HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = int(os.environ.get("PORT", "8080"))
@@ -26,7 +27,8 @@ TYPES = {".html": "text/html; charset=utf-8", ".png": "image/png", ".jpg": "imag
 
 
 def status_payload():
-    return {"ai": ai.status(), "sync": sync.status(), "station": core.STATION}
+    return {"ai": ai.status(), "vision": vision.status(), "reader": core.READER, "sync": sync.status(),
+            "station": core.STATION}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -97,10 +99,10 @@ class Handler(BaseHTTPRequestHandler):
                 if len(img) < 100:
                     return self.send_json({"error": "No image received."}, 400)
                 try:
-                    return self.send_json(ai.extract(img))
+                    return self.send_json(ai.read_photo(img, data.get("image_full") or None))
                 except ai.AIError as e:
                     return self.send_json({
-                        "ok": False, "error": str(e),
+                        "ok": False, "error": str(e), "reader": "gemma", "source": ai.model_label(),
                         "fields": {"fuel_type": "", "liters": None, "price_per_liter": None, "amount_pesos": None},
                         "message": "Local AI unavailable. You can still type the values and save."}, 503)
             if path == "/api/reconcile":
@@ -153,6 +155,7 @@ def main():
     a = ai.status(force=True)
     print("PumpLocal running at %s" % url)
     print("  Local AI: %s (%s)" % (a["detail"], core.MODEL))
+    print("  Photo reader: READER=%s" % core.READER)
     print("  Cloud sync: %s" % sync.status()["label"])
     print("  Press Ctrl+C to stop.", flush=True)
     if a.get("ok") and not a.get("mock"):
@@ -164,6 +167,9 @@ def main():
             except Exception as e:
                 print("  Warm-up failed: %s" % e, flush=True)
         threading.Thread(target=_warm, daemon=True).start()
+    if core.READER != "gemma":
+        # Check / compile the Apple Vision OCR helper now (first run compiles Swift) so photos are fast.
+        threading.Thread(target=vision.ensure, daemon=True).start()
     if os.environ.get("NO_BROWSER") != "1":
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
     try:

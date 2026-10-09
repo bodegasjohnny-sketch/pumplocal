@@ -19,6 +19,13 @@ MOCK_AI = os.environ.get("MOCK_AI", "0") == "1"
 DB_PATH = os.environ.get("DB_PATH", os.path.join(HERE, "pumplocal.db"))
 STATION = os.environ.get("STATION_NAME", "Demo Station")
 AI_TIMEOUT = float(os.environ.get("AI_TIMEOUT", "600"))
+# Short timeout for the header status check; a timeout during inference counts as "busy".
+STATUS_TIMEOUT = float(os.environ.get("STATUS_TIMEOUT", "1.5"))
+STATUS_CACHE = float(os.environ.get("STATUS_CACHE", "5"))
+# Photo reader: auto = Apple Vision OCR first, Gemma fallback; vision = OCR only; gemma = Gemma only.
+READER = os.environ.get("READER", "auto").strip().lower()
+if READER not in ("auto", "vision", "gemma"):
+    READER = "auto"
 # Cash differences within this many pesos are treated as OK (rounding / loose coins).
 CASH_TOLERANCE = Decimal(os.environ.get("CASH_TOLERANCE", "5.00"))
 
