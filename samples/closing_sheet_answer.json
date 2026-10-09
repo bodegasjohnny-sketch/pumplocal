@@ -94,25 +94,25 @@
       "1": 25,
       "5": 14,
       "10": 22,
-      "20": 19,
-      "50": 28,
-      "100": 43,
+      "20": 18,
+      "50": 27,
+      "100": 40,
       "200": 6,
-      "500": 22,
+      "500": 21,
       "1000": 34
     },
     "amounts": {
       "1": 25,
       "5": 70,
       "10": 220,
-      "20": 380,
-      "50": 1400,
-      "100": 4300,
+      "20": 360,
+      "50": 1350,
+      "100": 4000,
       "200": 1200,
-      "500": 11000,
+      "500": 10500,
       "1000": 34000
     },
-    "total": 52595.0
+    "total": 51725.0
   },
   "expenses": [
     {
@@ -144,27 +144,6 @@
     }
   ],
   "total_expenses": 725.0,
-  "oil_and_lubricants": [
-    {
-      "product": "TOP UP",
-      "qty": 1,
-      "unit_price": 120.0,
-      "total": 120.0
-    },
-    {
-      "product": "COOLANT 1L",
-      "qty": 1,
-      "unit_price": 180.0,
-      "total": 180.0
-    },
-    {
-      "product": "MOTOR OIL 1L",
-      "qty": 2,
-      "unit_price": 285.0,
-      "total": 570.0
-    }
-  ],
-  "oil_and_lubricants_total": 870.0,
   "expenses_outside_petty_cash": [],
   "collections": [
     {
@@ -192,9 +171,9 @@
   "total_collections": 5230.0,
   "summary_petty_cash": 3500,
   "opening_float": 3500,
-  "total_cash_expenses_collections": 58550.0,
-  "expected_cash": 52632.9,
-  "actual_cash": 52595.0,
+  "total_cash_expenses_collections": 57680.0,
+  "expected_cash": 51762.9,
+  "actual_cash": 51725.0,
   "over_short": -37.9,
   "short": 37.9,
   "over": 0,
@@ -202,7 +181,7 @@
     "liters_sold": "closing_volume - opening_volume (VOLUME - PREV VOLUME)",
     "sales_amount": "round_half_up(liters_sold * pump_price, 2)  (MC on the form; V = liters_sold)",
     "total_sales": "sum of machine sales_amount",
-    "expected_cash": "total_sales + oil_and_lubricants_total + petty_cash_in.total - total_expenses - total_collections",
+    "expected_cash": "total_sales + petty_cash_in.total - total_expenses - total_collections",
     "actual_cash": "petty_cash_out.total (cash counted by denomination)",
     "over_short": "actual_cash - expected_cash (negative = short)",
     "total_cash_expenses_collections": "actual_cash + total_expenses + total_collections"
