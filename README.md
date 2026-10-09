@@ -8,6 +8,12 @@
 
 Built for **AppBuildersPH Hackathon 2026**, theme: **Local AI**.
 
+## Origin
+
+- At the 1:00 PM PHT kickoff I screenshotted the challenge reveal and matched it to a real problem at my JCB gas station: when the Wi-Fi drops or a brownout hits, my existing station app (FuelTrack) can't record or check sales, a gap I hadn't accounted for.
+- PumpLocal is the offline piece FuelTrack was missing. It was built fresh during the hackathon, uses no FuelTrack code, and could plug into FuelTrack later. I can show the FuelTrack repo to judges on request to confirm none of its code is reused.
+- The first commits share the same minute (2:10 PM PHT) because the code written in the AI-assisted session after kickoff was pushed in one batch; see the timeline in [BUILD_LOG.md](BUILD_LOG.md).
+
 | Shift Photo | Pump (totalizer) | Cash Check | Ask (Tagalog / English) |
 |---|---|---|---|
 | ![Photo](docs/photo.png) | ![Pump](docs/pump.png) | ![Cash](docs/cash.png) | ![Ask](docs/ask.png) |
