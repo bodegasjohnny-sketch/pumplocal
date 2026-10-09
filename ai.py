@@ -290,24 +290,28 @@ def read_photo(image, image_full=None):
 
 # ---------------------------------------------------------------- 1b) totalizer photo -> reading
 TOTALIZER_PROMPT = (
-    "This photo shows a fuel pump's totalizer (lifetime counter) screen. Reply with JSON only: "
-    '{"reading": "the large counter number exactly as shown, digits only", '
-    '"display_label": "the word next to the number, e.g. Volume or Money, or null", '
+    "This photo shows a fuel pump's totalizer (lifetime counter) screen. A pump has a MONEY (pesos) counter and a "
+    "VOLUME (liters) counter. Reply with JSON only: "
+    '{"screen_title": "the title line, e.g. 2.Money All, or null", '
+    '"money": "the money/peso counter digits exactly as shown, or null", '
+    '"volume": "the volume/liter counter digits exactly as shown, or null", '
     '"pump_label": "pump or fuel label such as DIESEL 2, or null"}. '
-    "Ignore menu numbers like 2. in a title. Use null if not clearly visible. Do not guess."
+    "If only one counter is shown, use the screen title to decide which it is. Use null if not clearly visible. "
+    "Do not guess."
 )
-MOCK_TOTALIZER = ('Here is the totalizer:\n```json\n{"reading": "775397", "display_label": "Volume", '
-                  '"pump_label": "DIESEL 2"}\n```')
+MOCK_TOTALIZER = ('Here is the totalizer:\n```json\n{"screen_title": "2.Money All", "money": "775397", '
+                  '"volume": null, "pump_label": "DIESEL 2"}\n```')
 
 
 def _totalizer_result(p, raw, seconds, reader, source):
     ok = p["reading"] is not None
     if ok:
-        msg = "Read from photo. Check the number, choose the pump and Opening/Closing, then save."
+        msg = "Read from photo. Check the numbers, choose the pump and Opening/Closing, then save."
     else:
-        msg = "Could not find the totalizer number in the photo. Please type it in."
-    return {"ok": ok, "reading": p["reading"], "pump_name": p["pump_name"], "fuel_type": p["fuel_type"],
-            "unit_hint": p["unit_hint"], "label": p["label"], "confidence": p["confidence"], "notes": p["notes"],
+        msg = "Could not find a totalizer number in the photo. Please type it in."
+    return {"ok": ok, "reading": p["reading"], "amount": p["amount"], "volume": p["volume"],
+            "unassigned": p["unassigned"], "screen": p["screen"], "pump_name": p["pump_name"],
+            "fuel_type": p["fuel_type"], "confidence": p["confidence"], "notes": p["notes"],
             "raw": (raw or "")[:500], "message": msg, "seconds": round(seconds, 1), "reader": reader,
             "source": source}
 
@@ -324,11 +328,13 @@ def extract_totalizer(image_b64):
                    num_predict=80)
     obj = parse_json_text(raw) or {}
     lines = []
-    reading = obj.get("reading")
-    if reading not in (None, "", "null"):
-        label = obj.get("display_label")
-        label = label if label not in (None, "", "null") else "Total"
-        lines.append("%s %s" % (label, reading))
+    have = lambda k: obj.get(k) not in (None, "", "null")
+    if have("money"):
+        lines.append("Money %s" % obj["money"])
+    if have("volume"):
+        lines.append("Volume %s" % obj["volume"])
+    if have("reading"):  # older reply shape
+        lines.append("Total %s" % obj["reading"])
     if obj.get("pump_label") not in (None, "", "null"):
         lines.append(str(obj["pump_label"]))
     p = totalizer.parse(lines)
@@ -454,6 +460,9 @@ def template_pump_text(check, lang="en"):
     for g in groups:
         head = g["headline_tl" if lang == "tl" else "headline"]
         tol = g.get("tolerance_pct")
+        pc = g.get("price")
+        if pc and pc.get("ok") is False:
+            head += " " + pc["text_tl" if lang == "tl" else "text"]
         if g["status"] == "UNACCOUNTED":
             head += (" Lampas sa %s%% na palugit: tingnan kung may bentang hindi pa naitala (o utang), at basahin ulit "
                      "ang metro." % tol if lang == "tl" else
@@ -476,8 +485,9 @@ def pump_explanation(check, lang="en"):
     if not groups:
         return template_pump_text(check, lang), "template"
     language = "Tagalog" if lang == "tl" else "English"
-    facts = " ".join("%s: %s Status: %s (tolerance %s%%)." % (g["fuel_type"], g["headline"], g["status"],
-                                                               g["tolerance_pct"]) for g in groups)
+    facts = " ".join("%s: %s Status: %s (tolerance %s%%). %s" % (
+        g["fuel_type"], g["headline"], g["status"], g["tolerance_pct"],
+        (g["price"] or {}).get("text", "")) for g in groups)
     prompt = ("Gas station pump meter (totalizer) check vs recorded sales, numbers computed by the system: %s\n"
               "Write 1-2 short sentences in %s for the station owner: what this means and one practical next step. "
               "Use only these numbers. Do not calculate anything new." % (facts, language))
@@ -559,12 +569,16 @@ def summary_context(s):
         for r in p["pumps"]:
             if r["status"] == "NONE":
                 continue
-            unit = "pesos" if r["unit"] == "PHP" else "liters"
-            lines.append("- %s (%s, %s): opening %s, closing %s, dispensed %s." % (
-                r["name"], r["fuel_type"], unit, r["opening_value"] or "not recorded",
-                r["closing_value"] or "not recorded", r["dispensed_text"] or "n/a"))
+            lines.append("- %s (%s): peso totalizer opening %s, closing %s, dispensed %s; liter totalizer opening %s, "
+                         "closing %s, dispensed %s." % (
+                             r["name"], r["fuel_type"], r["opening_amount_value"] or "not recorded",
+                             r["closing_amount_value"] or "not recorded", r["dispensed_amount_text"] or "n/a",
+                             r["opening_volume_value"] or "not recorded", r["closing_volume_value"] or "not recorded",
+                             r["dispensed_volume_text"] or "n/a"))
         for g in p["groups"]:
             lines.append("- %s pump check: %s Status: %s." % (g["fuel_type"], g["headline"], g["status"]))
+            if g.get("price"):
+                lines.append("- %s %s" % (g["fuel_type"], g["price"]["text"]))
     else:
         lines.append("No pump meter readings yet this shift.")
     return "\n".join(lines)

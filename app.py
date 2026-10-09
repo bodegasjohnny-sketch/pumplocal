@@ -197,8 +197,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send_json({"error": " ".join(errors)}, 400)
                 return self.send_json(dict(pump_payload(), pump=pump))
             if path == "/api/pump/reading":
-                rec, errors, warnings = core.save_reading(data.get("pump_id"), data.get("kind"), data.get("reading"),
-                                                          data.get("source") or "manual")
+                rec, errors, warnings = core.save_reading(data.get("pump_id"), data.get("kind"), data.get("amount"),
+                                                          data.get("volume"), data.get("source") or "manual")
                 if errors:
                     return self.send_json({"error": " ".join(errors)}, 400)
                 return self.send_json(dict(pump_payload(), reading=rec, warnings=warnings))
@@ -207,6 +207,11 @@ class Handler(BaseHTTPRequestHandler):
                 if tol is None or tol < 0 or tol > 100:
                     return self.send_json({"error": "Tolerance must be a percent between 0 and 100."}, 400)
                 core.set_setting("pump_tolerance_pct", str(tol))
+                return self.send_json(pump_payload())
+            if path == "/api/pump/price_change":
+                errors = core.set_price_change(data.get("fuel_type"), data.get("old_price"), data.get("new_price"))
+                if errors:
+                    return self.send_json({"error": " ".join(errors)}, 400)
                 return self.send_json(pump_payload())
             if path == "/api/pump/check":
                 payload = pump_payload()

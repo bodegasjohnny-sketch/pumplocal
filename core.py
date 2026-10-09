@@ -30,7 +30,6 @@ if READER not in ("auto", "vision", "gemma"):
 CASH_TOLERANCE = Decimal(os.environ.get("CASH_TOLERANCE", "5.00"))
 # Pump totalizer vs recorded sales: a gap within this percent of the dispensed amount is OK (default 0.5%).
 PUMP_TOLERANCE_PCT = os.environ.get("PUMP_TOLERANCE_PCT", "0.5")
-PUMP_UNITS = ("L", "PHP")
 PUMP_DECIMALS = (0, 1, 2, 3)
 
 FUELS = ["Premium", "Unleaded", "Diesel"]
@@ -260,6 +259,18 @@ CREATE TABLE IF NOT EXISTS pump_readings (
   created_at TEXT NOT NULL,
   UNIQUE (shift_id, pump_id, kind)
 );
+CREATE TABLE IF NOT EXISTS totalizer_readings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  shift_id INTEGER NOT NULL REFERENCES shifts(id),
+  pump_id INTEGER NOT NULL REFERENCES pumps(id),
+  kind TEXT NOT NULL CHECK (kind IN ('open', 'close')),
+  amount TEXT,
+  volume TEXT,
+  amount_source TEXT,
+  volume_source TEXT,
+  created_at TEXT NOT NULL,
+  UNIQUE (shift_id, pump_id, kind)
+);
 CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
@@ -271,6 +282,7 @@ SYNC_TABLES = ("shifts", "sales", "cash_checks", "expenses")
 MIGRATIONS = {
     "sales": [("discount_pesos", "TEXT NOT NULL DEFAULT '0.00'"), ("discount_reason", "TEXT NOT NULL DEFAULT ''"),
               ("payment", "TEXT NOT NULL DEFAULT 'cash'"), ("customer", "TEXT NOT NULL DEFAULT ''")],
+    "pumps": [("amount_decimals", "INTEGER NOT NULL DEFAULT 0"), ("volume_decimals", "INTEGER NOT NULL DEFAULT 0")],
     "cash_checks": [("discounts", "TEXT NOT NULL DEFAULT '0.00'"), ("credit_sales", "TEXT NOT NULL DEFAULT '0.00'"),
                     ("expenses", "TEXT NOT NULL DEFAULT '0.00'"), ("cash_count", "TEXT NOT NULL DEFAULT ''")],
 }
@@ -301,6 +313,15 @@ def init_db():
             for name, decl in cols:
                 if name not in have:
                     conn.execute("ALTER TABLE %s ADD COLUMN %s %s" % (table, name, decl))
+        # v2 pump readings (one counter per pump, unit L or PHP) -> peso + liter totalizers. Seeded demo rows are
+        # dropped (seed.seed_pumps_if_demo re-seeds them with both counters); real rows keep their number.
+        if conn.execute("SELECT COUNT(*) FROM totalizer_readings").fetchone()[0] == 0:
+            for r in conn.execute("SELECT r.*, p.unit FROM pump_readings r JOIN pumps p ON p.id=r.pump_id "
+                                  "WHERE r.source != 'seed'").fetchall():
+                col = "amount" if r["unit"] == "PHP" else "volume"
+                conn.execute("INSERT OR IGNORE INTO totalizer_readings (shift_id, pump_id, kind, %s, %s_source, "
+                             "created_at) VALUES (?,?,?,?,?,?)" % (col, col),
+                             (r["shift_id"], r["pump_id"], r["kind"], r["reading"], r["source"], r["created_at"]))
 
 
 def rows(sql, args=()):
@@ -334,8 +355,10 @@ def new_shift(attendant=""):
         cur = conn.execute("INSERT INTO shifts (opened_at, attendant) VALUES (?, ?)", (now(), attendant[:60]))
         sid = cur.lastrowid
         if old:  # last shift's CLOSING totalizer is this shift's OPENING (staff can still re-read it)
-            conn.execute("INSERT INTO pump_readings (shift_id, pump_id, kind, reading, source, created_at) "
-                         "SELECT ?, pump_id, 'open', reading, 'carried', ? FROM pump_readings "
+            conn.execute("INSERT INTO totalizer_readings (shift_id, pump_id, kind, amount, volume, amount_source, "
+                         "volume_source, created_at) SELECT ?, pump_id, 'open', amount, volume, "
+                         "CASE WHEN amount IS NULL THEN NULL ELSE 'carried' END, "
+                         "CASE WHEN volume IS NULL THEN NULL ELSE 'carried' END, ? FROM totalizer_readings "
                          "WHERE shift_id=? AND kind='close'", (sid, now(), old["id"]))
         conn.commit()
     return rows("SELECT * FROM shifts WHERE id=?", (sid,))[0]
@@ -458,6 +481,13 @@ def queued_count():
 
 
 # ---------------------------------------------------------------- pump totalizer (meter) check
+# Each pump has two running lifetime counters: the PESO (amount, "Money") totalizer and the LITER (volume)
+# totalizer. Both are read at shift start (opening) and shift end (closing); dispensed = closing - opening.
+COUNTERS = ("amount", "volume")
+COUNTER_UNIT = {"amount": "PHP", "volume": "L"}
+PRICE_TOLERANCE = Decimal(os.environ.get("PRICE_TOLERANCE", "0.05"))  # pesos per liter, covers rounding
+
+
 def get_setting(key, default=None):
     r = rows("SELECT value FROM settings WHERE key=?", (key,))
     return r[0]["value"] if r else default
@@ -465,6 +495,10 @@ def get_setting(key, default=None):
 
 def set_setting(key, value):
     execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, str(value)))
+
+
+def del_setting(key):
+    execute("DELETE FROM settings WHERE key=?", (key,))
 
 
 def pump_tolerance():
@@ -476,15 +510,15 @@ def clean_reading(value):
     """'775,397' / ' 775 397 ' / '7753.97' -> digits as shown ('775397', '7753.97'); None if not a number."""
     if value is None or isinstance(value, bool):
         return None
-    s = re.sub(r"[\s,]", "", str(value))
+    s = re.sub(r"[\s,₱]", "", str(value))
     if not re.fullmatch(r"\d{1,12}(?:\.\d{1,4})?", s):
         return None
     return s
 
 
 def reading_value(reading, decimals=0):
-    """Apply the pump's hidden decimal places: '775397' with 2 -> 7753.97, with 3 -> 775.397.
-    A reading typed with its own decimal point is taken as is."""
+    """Readings are whole numbers as displayed (decimals 0, the default). If a pump hides decimal places,
+    set them per counter: '775397' with 2 -> 7753.97. A reading typed with its own decimal point is used as is."""
     s = clean_reading(reading)
     if s is None:
         return None
@@ -509,7 +543,7 @@ def _q_unit(d, unit):
 
 
 def dispensed(opening, closing, decimals=0):
-    """closing - opening in the pump's unit. Closing lower than opening is an error (misread, wrong decimals,
+    """closing - opening of a running total. Closing lower than opening is an error (misread, wrong decimals,
     or the counter rolled over), never a negative sale."""
     o, c = reading_value(opening, decimals), reading_value(closing, decimals)
     if o is None or c is None:
@@ -518,14 +552,14 @@ def dispensed(opening, closing, decimals=0):
         return {"ok": False, "value": None, "incomplete": False,
                 "error": "Closing reading (%s) is lower than opening (%s). Check the photo and the decimals setting. "
                          "If the meter rolled over past its maximum, record it by hand." % (
-                    clean_reading(closing), clean_reading(opening))}
+                             clean_reading(closing), clean_reading(opening))}
     return {"ok": True, "value": c - o, "error": None, "incomplete": False}
 
 
 def gap_check(pump_dispensed, recorded, unit="L", tolerance_pct=None):
-    """Compare what the pump meter says was dispensed with what was recorded as sales. Pure code.
+    """Compare what the pump counter says was dispensed with what was recorded as sales. Pure code.
 
-    gap > 0: fuel left the pump without a recorded sale (UNACCOUNTED).
+    gap > 0: fuel/money left the pump without a recorded sale (UNACCOUNTED).
     gap < 0: more was recorded than the pump dispensed (OVER_RECORDED: duplicate sale or a misread meter).
     """
     tol = pump_tolerance() if tolerance_pct is None else Decimal(str(tolerance_pct))
@@ -533,8 +567,7 @@ def gap_check(pump_dispensed, recorded, unit="L", tolerance_pct=None):
     R = _q_unit(Decimal(str(recorded)), unit)
     gap = _q_unit(D - R, unit)
     pct = q2(gap / D * 100) if D != 0 else None
-    allowed = D * tol / 100
-    if abs(gap) <= allowed:
+    if abs(gap) <= D * tol / 100:
         status = "OK"
     elif gap > 0:
         status = "UNACCOUNTED"
@@ -546,19 +579,18 @@ def gap_check(pump_dispensed, recorded, unit="L", tolerance_pct=None):
 
 
 def gap_headline(g, lang="en"):
-    """'Pump says 181 L dispensed; recorded sales 174.216 L; 6.784 L (3.75%) unaccounted' (code, not AI)."""
+    """'Pump says 181 L dispensed; recorded sales 174.216 L; 6.784 L (3.75%) unaccounted.' (code, not AI)"""
     u = g["unit"]
     D, R, G = Decimal(g["dispensed"]), Decimal(g["recorded"]), Decimal(g["gap"])
     pct = (" (%s%%)" % Decimal(g["gap_pct"]).copy_abs()) if g["gap_pct"] is not None else ""
-    what = "sales" if lang == "en" else "benta"
     if lang == "tl":
-        head = "Ayon sa metro ng pump, %s ang nailabas; %s ang naitalang %s" % (fmt_qty(D, u), fmt_qty(R, u), what)
+        head = "Ayon sa metro ng pump, %s ang nailabas; %s ang naitalang benta" % (fmt_qty(D, u), fmt_qty(R, u))
         if g["status"] == "UNACCOUNTED":
             return "%s; %s%s ang hindi naitala." % (head, fmt_qty(G, u), pct)
         if g["status"] == "OVER_RECORDED":
             return "%s; %s%s ang sobra sa naitala kumpara sa metro." % (head, fmt_qty(-G, u), pct)
         return "%s; pasok sa %s%% na palugit." % (head, g["tolerance_pct"])
-    head = "Pump says %s dispensed; recorded %s %s" % (fmt_qty(D, u), what, fmt_qty(R, u))
+    head = "Pump says %s dispensed; recorded sales %s" % (fmt_qty(D, u), fmt_qty(R, u))
     if g["status"] == "UNACCOUNTED":
         return "%s; %s%s unaccounted." % (head, fmt_qty(G, u), pct)
     if g["status"] == "OVER_RECORDED":
@@ -566,8 +598,83 @@ def gap_headline(g, lang="en"):
     return "%s; within the %s%% tolerance." % (head, g["tolerance_pct"])
 
 
+# ---- price per liter sanity check (a WARNING, never a theft flag)
+def _price_key(shift_id, fuel):
+    return "price_change:%s:%s" % (shift_id, fuel)
+
+
+def set_price_change(fuel, old_price, new_price, shift_id=None):
+    """'Price changed this shift' for a fuel: any implied price between old and new passes. Empty clears it.
+    Returns errors."""
+    fuel = normalize_fuel(fuel)
+    shift_id = shift_id or current_shift()["id"]
+    if not fuel:
+        return ["Choose the fuel."]
+    if old_price in (None, "") and new_price in (None, ""):
+        del_setting(_price_key(shift_id, fuel))
+        return []
+    o, n = dec(old_price), dec(new_price)
+    if o is None or n is None or o <= 0 or n <= 0:
+        return ["Enter both the old and the new price per liter."]
+    set_setting(_price_key(shift_id, fuel), "%s,%s" % (q2(o), q2(n)))
+    return []
+
+
+def get_price_change(fuel, shift_id):
+    v = get_setting(_price_key(shift_id, fuel))
+    if not v:
+        return None
+    o, n = v.split(",")
+    return {"old": o, "new": n}
+
+
+def price_check(pesos, liters, recorded_prices=(), price_change=None, tolerance=None):
+    """Implied price per liter = pesos dispensed / liters dispensed, compared with the posted price.
+
+    Reference: the old..new range if the price changed this shift, else the price(s) used in recorded sales.
+    Passes within +/- PRICE_TOLERANCE (P0.05/L) of that range. A miss is a warning to re-check readings."""
+    tol = PRICE_TOLERANCE if tolerance is None else Decimal(str(tolerance))
+    P, L = Decimal(str(pesos)), Decimal(str(liters))
+    if L <= 0:
+        return None
+    implied = P / L
+    if price_change:
+        lo, hi = sorted([Decimal(price_change["old"]), Decimal(price_change["new"])])
+        basis = "price change"
+    elif recorded_prices:
+        lo, hi = min(recorded_prices), max(recorded_prices)
+        basis = "recorded sales"
+    else:
+        return {"implied": str(q2(implied)), "ok": None, "basis": "none", "low": None, "high": None,
+                "tolerance": str(q2(tol)),
+                "text": "Implied price %s/L (no posted price to compare)." % peso(implied),
+                "text_tl": "Presyo mula sa metro: %s/L (walang presyong maikukumpara)." % peso(implied)}
+    ok = lo - tol <= implied <= hi + tol
+    ref = peso(lo) if lo == hi else "%s–%s" % (peso(lo), peso(hi))
+    if ok:
+        text = "Price check OK: implied %s/L (pesos ÷ liters) vs posted %s/L." % (peso(implied), ref)
+        text_tl = "Tama ang presyo: %s/L mula sa metro vs %s/L na presyo." % (peso(implied), ref)
+    else:
+        text = ("Price check warning: implied %s/L (pesos ÷ liters) vs posted %s/L (±%s). Re-check the peso and "
+                "liter readings, or set the price change for this shift. This is not a missing-fuel flag." % (
+                    peso(implied), ref, peso(tol)))
+        text_tl = ("Babala sa presyo: %s/L mula sa metro vs %s/L (±%s). Basahin ulit ang peso at litro sa metro, o "
+                   "ilagay ang pagbabago ng presyo." % (peso(implied), ref, peso(tol)))
+    return {"implied": str(q2(implied)), "ok": ok, "basis": basis, "low": str(q2(lo)), "high": str(q2(hi)),
+            "tolerance": str(q2(tol)), "text": text, "text_tl": text_tl}
+
+
+# ---- pumps and readings
 def list_pumps():
     return rows("SELECT * FROM pumps ORDER BY name")
+
+
+def _int_dec(v):
+    try:
+        d = int(v if v not in (None, "") else 0)
+    except (TypeError, ValueError):
+        return -1
+    return d
 
 
 def save_pump(data):
@@ -576,42 +683,38 @@ def save_pump(data):
     if name.isupper() or name.islower():
         name = name.title()  # "DIESEL 2" / "diesel 2" -> "Diesel 2"
     fuel = normalize_fuel(data.get("fuel_type"))
-    unit = str(data.get("unit") or "L").upper()
-    unit = {"LITERS": "L", "LITRES": "L", "PESOS": "PHP", "₱": "PHP", "P": "PHP"}.get(unit, unit)
-    try:
-        decimals = int(data.get("decimals") if data.get("decimals") not in (None, "") else 0)
-    except (TypeError, ValueError):
-        decimals = -1
+    pid = data.get("id")
+    old = rows("SELECT * FROM pumps WHERE id=?", (int(pid),)) if pid else []
+    old = old[0] if old else {}
+    ad = _int_dec(data.get("amount_decimals", old.get("amount_decimals", 0)))
+    vd = _int_dec(data.get("volume_decimals", old.get("volume_decimals", 0)))
     errors = []
     if not name:
         errors.append("Pump name is required (e.g. Diesel 2).")
     if not fuel:
         errors.append("Fuel type is required.")
-    if unit not in PUMP_UNITS:
-        errors.append("Unit must be Liters (L) or Pesos (PHP).")
-    if decimals not in PUMP_DECIMALS:
+    if ad not in PUMP_DECIMALS or vd not in PUMP_DECIMALS:
         errors.append("Decimal places must be 0, 1, 2 or 3.")
     if errors:
         return None, errors
-    pid = data.get("id")
     clash = rows("SELECT id FROM pumps WHERE name=?", (name,))
     if clash and (not pid or int(pid) != clash[0]["id"]):
         if pid:
             return None, ["Another pump is already named %s." % name]
         pid = clash[0]["id"]  # same name: update it
     if pid:
-        execute("UPDATE pumps SET name=?, fuel_type=?, unit=?, decimals=? WHERE id=?",
-                (name, fuel, unit, decimals, int(pid)))
+        execute("UPDATE pumps SET name=?, fuel_type=?, amount_decimals=?, volume_decimals=? WHERE id=?",
+                (name, fuel, ad, vd, int(pid)))
     else:
-        pid = execute("INSERT INTO pumps (name, fuel_type, unit, decimals, created_at) VALUES (?,?,?,?,?)",
-                      (name, fuel, unit, decimals, now()))
+        pid = execute("INSERT INTO pumps (name, fuel_type, amount_decimals, volume_decimals, created_at) "
+                      "VALUES (?,?,?,?,?)", (name, fuel, ad, vd, now()))
     r = rows("SELECT * FROM pumps WHERE id=?", (int(pid),))
     return (r[0], []) if r else (None, ["Pump not found."])
 
 
-def save_reading(pump_id, kind, reading, source="manual", shift_id=None, created_at=None):
-    """Store this shift's OPENING ('open') or CLOSING ('close') totalizer for a pump (re-saving replaces it).
-    Returns (record, errors, warnings)."""
+def save_reading(pump_id, kind, amount=None, volume=None, source="manual", shift_id=None, created_at=None):
+    """Store this shift's OPENING ('open') or CLOSING ('close') totalizers for a pump: the peso (amount) counter,
+    the liter (volume) counter, or both. A counter left empty keeps its saved value. Returns (record, errors, warnings)."""
     kind = {"opening": "open", "closing": "close"}.get(kind, kind)
     if kind not in ("open", "close"):
         return None, ["Choose opening or closing."], []
@@ -622,94 +725,158 @@ def save_reading(pump_id, kind, reading, source="manual", shift_id=None, created
     if not pump:
         return None, ["Choose a pump."], []
     pump = pump[0]
-    s = clean_reading(reading)
-    if s is None:
-        return None, ["Enter the totalizer reading (digits only, e.g. 775397)."], []
+    vals, errors = {}, []
+    for name, raw in (("amount", amount), ("volume", volume)):
+        if raw in (None, ""):
+            continue
+        s = clean_reading(raw)
+        if s is None:
+            errors.append("The %s totalizer must be digits only, e.g. 775397." % ("peso" if name == "amount" else "liter"))
+        else:
+            vals[name] = s
+    if not vals and not errors:
+        errors.append("Enter the peso totalizer, the liter totalizer, or both.")
+    if errors:
+        return None, errors, []
     shift_id = shift_id or current_shift()["id"]
     source = source if source in ("photo", "manual", "seed", "carried") else "manual"
-    execute("INSERT OR REPLACE INTO pump_readings (shift_id, pump_id, kind, reading, source, created_at) "
-            "VALUES (?,?,?,?,?,?)", (shift_id, pump["id"], kind, s, source, created_at or now()))
-    rec = rows("SELECT * FROM pump_readings WHERE shift_id=? AND pump_id=? AND kind=?", (shift_id, pump["id"], kind))[0]
-    warnings = []
-    other = rows("SELECT reading FROM pump_readings WHERE shift_id=? AND pump_id=? AND kind=?",
+    key = (shift_id, pump["id"], kind)
+    with _db_lock, connect() as conn:
+        cur = conn.execute("SELECT * FROM totalizer_readings WHERE shift_id=? AND pump_id=? AND kind=?", key).fetchone()
+        if cur is None:
+            conn.execute("INSERT INTO totalizer_readings (shift_id, pump_id, kind, created_at) VALUES (?,?,?,?)",
+                         key + (created_at or now(),))
+        for name, s in vals.items():
+            conn.execute("UPDATE totalizer_readings SET %s=?, %s_source=?, created_at=? WHERE shift_id=? AND pump_id=? "
+                         "AND kind=?" % (name, name), (s, source, created_at or now()) + key)
+        conn.commit()
+    rec = rows("SELECT * FROM totalizer_readings WHERE shift_id=? AND pump_id=? AND kind=?", key)[0]
+    other = rows("SELECT * FROM totalizer_readings WHERE shift_id=? AND pump_id=? AND kind=?",
                  (shift_id, pump["id"], "close" if kind == "open" else "open"))
+    warnings = []
     if other:
-        o, c = (s, other[0]["reading"]) if kind == "open" else (other[0]["reading"], s)
-        d = dispensed(o, c, pump["decimals"])
-        if d["error"]:
-            warnings.append(d["error"])
+        for name in COUNTERS:
+            if rec[name] and other[0][name]:
+                o, c = (rec[name], other[0][name]) if kind == "open" else (other[0][name], rec[name])
+                d = dispensed(o, c, pump["%s_decimals" % name])
+                if d["error"]:
+                    warnings.append(("Peso" if name == "amount" else "Liter") + " totalizer: " + d["error"])
     return rec, [], warnings
 
 
+def _pump_row(p, o, c):
+    row = dict(p)
+    row["error"], row["errors"] = None, []
+    statuses = []
+    for name in COUNTERS:
+        unit, decs = COUNTER_UNIT[name], p["%s_decimals" % name]
+        ov, cv = (o or {}).get(name), (c or {}).get(name)
+        row["opening_" + name], row["closing_" + name] = ov, cv
+        row["opening_%s_source" % name] = (o or {}).get(name + "_source")
+        row["closing_%s_source" % name] = (c or {}).get(name + "_source")
+        row["opening_%s_value" % name] = str(reading_value(ov, decs)) if ov else None
+        row["closing_%s_value" % name] = str(reading_value(cv, decs)) if cv else None
+        row["dispensed_" + name], row["dispensed_%s_text" % name] = None, None
+        if not ov and not cv:
+            st = "NONE"
+        elif not (ov and cv):
+            st = "INCOMPLETE"
+        else:
+            d = dispensed(ov, cv, decs)
+            if d["error"]:
+                st = "ERROR"
+                msg = ("Peso" if name == "amount" else "Liter") + " totalizer: " + d["error"]
+                row["errors"].append(msg)
+                row["error"] = row["error"] or msg
+            else:
+                st = "OK"
+                v = _q_unit(d["value"], unit)
+                row["dispensed_" + name], row["dispensed_%s_text" % name] = str(v), fmt_qty(v, unit)
+        row["status_" + name] = st
+        statuses.append(st)
+    if "ERROR" in statuses:
+        row["status"] = "ERROR"
+    elif all(s == "NONE" for s in statuses):
+        row["status"] = "NONE"
+    elif "OK" in statuses and "INCOMPLETE" not in statuses:
+        row["status"] = "OK"
+    else:
+        row["status"] = "INCOMPLETE"
+    return row
+
+
+STATUS_RANK = {"ERROR": 0, "UNACCOUNTED": 1, "OVER_RECORDED": 2, "OK": 3}
+
+
 def pump_check(shift_id=None, tolerance_pct=None):
-    """Per pump: opening, closing, dispensed. Per fuel (and unit): pump total vs recorded sales -> gap."""
+    """Per pump: both totalizers, dispensed pesos and liters. Per fuel: pump totals vs recorded sales (liters vs
+    sales liters, pesos vs gross sales pesos), plus the implied price per liter as a sanity check (warning only)."""
     shift = rows("SELECT * FROM shifts WHERE id=?", (shift_id,))[0] if shift_id else current_shift()
     sid = shift["id"]
     tol = pump_tolerance() if tolerance_pct is None else Decimal(str(tolerance_pct))
-    readings = {}
-    for r in rows("SELECT * FROM pump_readings WHERE shift_id=?", (sid,)):
-        readings[(r["pump_id"], r["kind"])] = r
+    readings = {(r["pump_id"], r["kind"]): r for r in rows("SELECT * FROM totalizer_readings WHERE shift_id=?", (sid,))}
     sales = {}
-    for s in rows("SELECT fuel_type, liters, amount_pesos FROM sales WHERE shift_id=? AND voided=0", (sid,)):
-        t = sales.setdefault(s["fuel_type"], {"L": Decimal(0), "PHP": Decimal(0), "count": 0})
-        t["L"] += Decimal(s["liters"])
-        t["PHP"] += Decimal(s["amount_pesos"])
+    for s in rows("SELECT fuel_type, liters, amount_pesos, price_per_liter FROM sales WHERE shift_id=? AND voided=0",
+                  (sid,)):
+        t = sales.setdefault(s["fuel_type"], {"volume": Decimal(0), "amount": Decimal(0), "count": 0, "prices": set()})
+        t["volume"] += Decimal(s["liters"])
+        t["amount"] += Decimal(s["amount_pesos"])  # gross: the pump's peso counter doesn't know about discounts
         t["count"] += 1
+        t["prices"].add(Decimal(s["price_per_liter"]))
     pumps, groups = [], {}
     for p in list_pumps():
-        o, c = readings.get((p["id"], "open")), readings.get((p["id"], "close"))
-        row = dict(p, opening=o["reading"] if o else None, closing=c["reading"] if c else None,
-                   opening_source=o["source"] if o else None, closing_source=c["source"] if c else None,
-                   opening_value=None, closing_value=None, dispensed=None, dispensed_text=None, error=None)
-        for k, r in (("opening_value", o), ("closing_value", c)):
-            if r:
-                row[k] = str(reading_value(r["reading"], p["decimals"]))
-        if not o and not c:
-            row["status"] = "NONE"
-        elif not (o and c):
-            row["status"] = "INCOMPLETE"
-        else:
-            d = dispensed(o["reading"], c["reading"], p["decimals"])
-            if d["error"]:
-                row["status"], row["error"] = "ERROR", d["error"]
-            else:
-                v = _q_unit(d["value"], p["unit"])
-                row["status"], row["dispensed"], row["dispensed_text"] = "OK", str(v), fmt_qty(v, p["unit"])
+        row = _pump_row(p, readings.get((p["id"], "open")), readings.get((p["id"], "close")))
         pumps.append(row)
         if row["status"] == "NONE":
             continue  # pump not read this shift: leave it out of the comparison
-        g = groups.setdefault((p["fuel_type"], p["unit"]), {"fuel_type": p["fuel_type"], "unit": p["unit"],
-                                                              "pumps": [], "total": Decimal(0), "problems": []})
+        g = groups.setdefault(p["fuel_type"], {"pumps": [], "rows": []})
         g["pumps"].append(p["name"])
-        if row["status"] == "OK":
-            g["total"] += Decimal(row["dispensed"])
-        else:
-            g["problems"].append(row)
+        g["rows"].append(row)
     out = []
     order = {f: i for i, f in enumerate(FUELS)}
-    for (fuel, unit), g in sorted(groups.items(), key=lambda kv: (order.get(kv[0][0], 9), kv[0][0], kv[0][1])):
-        sold = sales.get(fuel, {"L": Decimal(0), "PHP": Decimal(0), "count": 0})
-        item = {"fuel_type": fuel, "unit": unit, "pumps": g["pumps"], "sales_count": sold["count"]}
-        errs = [r for r in g["problems"] if r["status"] == "ERROR"]
+    for fuel, g in sorted(groups.items(), key=lambda kv: (order.get(kv[0], 9), kv[0])):
+        sold = sales.get(fuel, {"volume": Decimal(0), "amount": Decimal(0), "count": 0, "prices": set()})
+        item = {"fuel_type": fuel, "pumps": g["pumps"], "sales_count": sold["count"], "tolerance_pct": str(tol),
+                "liters": None, "pesos": None, "price": None, "price_change": get_price_change(fuel, sid)}
+        errs = [e for r in g["rows"] for e in ["%s: %s" % (r["name"], m) for m in r["errors"]]]
+        waiting = []
+        for name, key in (("volume", "liters"), ("amount", "pesos")):
+            sts = [r["status_" + name] for r in g["rows"]]
+            if any(s == "INCOMPLETE" for s in sts):
+                waiting.append(name)
+            if "ERROR" in sts or "INCOMPLETE" in sts or "OK" not in sts:
+                continue
+            total = sum((Decimal(r["dispensed_" + name]) for r in g["rows"] if r["status_" + name] == "OK"),
+                        Decimal(0))
+            c = gap_check(total, sold[name], COUNTER_UNIT[name], tol)
+            c["headline"], c["headline_tl"] = gap_headline(c, "en"), gap_headline(c, "tl")
+            item[key] = c
         if errs:
-            item.update(status="ERROR", flag=True, tolerance_pct=str(tol),
-                        headline="%s: %s" % (errs[0]["name"], errs[0]["error"]),
-                        headline_tl="%s: Mas mababa ang closing kaysa opening. Suriin ang litrato at decimals." %
-                        errs[0]["name"])
-        elif g["problems"]:
-            names = ", ".join(r["name"] for r in g["problems"])
-            item.update(status="INCOMPLETE", flag=False, tolerance_pct=str(tol),
-                        headline="Waiting for the %s reading of %s." % (
-                            "closing" if g["problems"][0]["opening"] else "opening", names),
-                        headline_tl="Hinihintay pa ang %s na reading ng %s." % (
-                            "closing" if g["problems"][0]["opening"] else "opening", names))
+            item.update(status="ERROR", flag=True, headline=" ".join(errs),
+                        headline_tl=" ".join(errs).replace("is lower than opening", "ay mas mababa sa opening"))
+        elif not (item["liters"] or item["pesos"]):
+            names = ", ".join(r["name"] for r in g["rows"] if r["status"] == "INCOMPLETE") or ", ".join(g["pumps"])
+            item.update(status="INCOMPLETE", flag=False,
+                        headline="Waiting for the closing (or opening) totalizer of %s." % names,
+                        headline_tl="Hinihintay pa ang closing (o opening) na reading ng %s." % names)
         else:
-            item.update(gap_check(g["total"], sold[unit], unit, tol))
-            item["headline"] = gap_headline(item, "en")
-            item["headline_tl"] = gap_headline(item, "tl")
+            parts = [item[k] for k in ("liters", "pesos") if item[k]]
+            item["status"] = min((p["status"] for p in parts), key=lambda s: STATUS_RANK[s])
+            item["flag"] = item["status"] != "OK"
+            item["headline"] = " ".join(p["headline"] for p in parts)
+            item["headline_tl"] = " ".join(p["headline_tl"] for p in parts)
+            if waiting:
+                item["headline"] += " (%s totalizer not complete yet.)" % " and ".join(
+                    "peso" if w == "amount" else "liter" for w in waiting)
+                item["headline_tl"] += " (Kulang pa ang reading ng %s.)" % " at ".join(
+                    "peso" if w == "amount" else "litro" for w in waiting)
+            if item["liters"] and item["pesos"]:
+                item["price"] = price_check(item["pesos"]["dispensed"], item["liters"]["dispensed"],
+                                            sorted(sold["prices"]), item["price_change"])
         out.append(item)
-    return {"shift_id": sid, "tolerance_pct": str(tol), "pumps": pumps, "groups": out,
-            "flagged": [g for g in out if g.get("flag")]}
+    return {"shift_id": sid, "tolerance_pct": str(tol), "price_tolerance": str(q2(PRICE_TOLERANCE)), "pumps": pumps,
+            "groups": out, "flagged": [g for g in out if g.get("flag")],
+            "price_warnings": [g for g in out if g.get("price") and g["price"]["ok"] is False]}
 
 
 # ---------------------------------------------------------------- expenses / petty cash out

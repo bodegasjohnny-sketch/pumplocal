@@ -1,4 +1,4 @@
-"""Pump totalizer tests: OCR text -> reading (totalizer.py) and the pump-vs-sales gap math (core.py).
+"""Pump totalizer tests: OCR text -> peso/liter readings (totalizer.py) and the pump-vs-sales math (core.py).
 
 The real photo samples/real_totalizer_diesel2.png (from the team's own station) shows an LCD menu
 "2.Money All" / "Volume 775397" / "Cancel" "Ok", a sticker "DIESEL 2" and partly visible side buttons
@@ -18,13 +18,16 @@ import totalizer  # noqa: E402
 
 
 class ParseRealPhotoTests(unittest.TestCase):
+    """The real photo shows ONE counter under the menu title "2.Money All": the PESO totalizer (confirmed by the
+    station owner), even though its line reads "Volume". The liter totalizer is the other counter on that pump."""
+
     def check_real(self, lines, confidence="labelled"):
         r = totalizer.parse(lines)
-        self.assertEqual(r["reading"], "775397", r)
+        self.assertEqual((r["amount"], r["volume"]), ("775397", None), r)
         self.assertEqual(r["pump_name"], "Diesel 2")
         self.assertEqual(r["fuel_type"].upper(), "DIESEL")
         self.assertEqual(r["confidence"], confidence)
-        self.assertEqual(r["unit_hint"], "L")  # the line says "Volume" (a hint only; unit is set per pump)
+        self.assertEqual(r["screen"], "amount")
         return r
 
     def test_real_photo_plain_lines(self):
@@ -40,15 +43,25 @@ class ParseRealPhotoTests(unittest.TestCase):
         self.check_real(["2.Money All", "Vo1ume 775 397", "Cancel Ok", "DIESEL 2"])
         self.check_real(["Volume 775,397", "2.Money All", "Qua", "DIESEL 2"])
 
+    def test_both_counters_on_one_screen(self):
+        r = totalizer.parse(["Money 775397", "Volume 13508", "DIESEL 2"])
+        self.assertEqual((r["amount"], r["volume"], r["unassigned"]), ("775397", "13508", None))
+        r = totalizer.parse(["Amount 4521337", "Liters 78765", "PREMIUM 1", "PUMP 3"])
+        self.assertEqual((r["amount"], r["volume"], r["pump_name"]), ("4521337", "78765", "Premium 1"))
+
+    def test_volume_screen(self):
+        r = totalizer.parse(["1.Volume All", "Volume 13508", "DIESEL 2"])
+        self.assertEqual((r["amount"], r["volume"], r["screen"]), (None, "13508", "volume"))
+
     def test_menu_and_label_numbers_ignored(self):
         r = totalizer.parse(["2.Money All", "DIESEL 2"])
         self.assertIsNone(r["reading"])  # "2." and "DIESEL 2" are never the reading
         self.assertEqual(r["pump_name"], "Diesel 2")
 
-    def test_largest_labelled_number_wins(self):
-        r = totalizer.parse(["Total 1", "Amount 4521337.50", "Volume 78765.432", "PREMIUM 1", "PUMP 3"])
-        self.assertEqual((r["reading"], r["pump_name"], r["fuel_type"]), ("4521337.50", "Premium 1", "Premium"))
-        self.assertEqual(r["unit_hint"], "PHP")
+    def test_unknown_counter_is_unassigned(self):
+        r = totalizer.parse(["Total 99999"])
+        self.assertEqual((r["amount"], r["volume"], r["unassigned"]), (None, None, "99999"))
+        self.assertTrue(r["notes"])
 
     def test_pump_labels(self):
         self.assertEqual(totalizer.pump_label(["UNLEADED"]), ("Unleaded", "Unleaded"))
@@ -104,6 +117,23 @@ class ReadingMathTests(unittest.TestCase):
         self.assertIsNone(core.gap_check("0", "0", "L", "0.5")["gap_pct"])
 
 
+class PriceCheckTests(unittest.TestCase):
+    def test_price_check_tolerance_and_price_change(self):
+        ok = core.price_check("10390", "181", [Decimal("57.40")])
+        self.assertEqual((ok["implied"], ok["ok"], ok["basis"]), ("57.40", True, "recorded sales"))  # 57.4033
+        self.assertTrue(core.price_check("5745", "100", [Decimal("57.40")])["ok"])  # +0.05 passes
+        warn = core.price_check("5746", "100", [Decimal("57.40")])  # +0.06 fails
+        self.assertFalse(warn["ok"])
+        self.assertIn("not a missing-fuel flag", warn["text"])
+        # price went from 57.40 to 58.40 mid-shift: anything in between passes
+        pc = {"old": "57.40", "new": "58.40"}
+        self.assertTrue(core.price_check("5790", "100", [Decimal("57.40")], pc)["ok"])
+        self.assertTrue(core.price_check("5845", "100", [], pc)["ok"])
+        self.assertFalse(core.price_check("5850", "100", [], pc)["ok"])
+        self.assertIsNone(core.price_check("5790", "100", [])["ok"])  # nothing to compare
+        self.assertIsNone(core.price_check("10", "0", []))
+
+
 class PumpStorageTests(unittest.TestCase):
     def setUp(self):
         self.old = core.DB_PATH
@@ -114,41 +144,82 @@ class PumpStorageTests(unittest.TestCase):
         core.DB_PATH = self.old
 
     def test_pump_validation(self):
-        p, e = core.save_pump({"name": "DIESEL 2", "fuel_type": "diesel", "unit": "Liters", "decimals": "2"})
-        self.assertEqual((p["name"], p["fuel_type"], p["unit"], p["decimals"], e), ("Diesel 2", "Diesel", "L", 2, []))
+        p, e = core.save_pump({"name": "DIESEL 2", "fuel_type": "diesel"})
+        self.assertEqual((p["name"], p["fuel_type"], p["amount_decimals"], p["volume_decimals"], e),
+                         ("Diesel 2", "Diesel", 0, 0, []))  # whole numbers as displayed by default
         self.assertTrue(core.save_pump({"name": "", "fuel_type": "Diesel"})[1])
-        self.assertTrue(core.save_pump({"name": "X", "fuel_type": "Diesel", "unit": "gal"})[1])
-        self.assertTrue(core.save_pump({"name": "X", "fuel_type": "Diesel", "decimals": 5})[1])
-        p2, _ = core.save_pump({"name": "diesel 2", "fuel_type": "Diesel", "unit": "PHP"})
-        self.assertEqual((p2["id"], p2["unit"]), (p["id"], "PHP"))  # same name updates
+        self.assertTrue(core.save_pump({"name": "X", "fuel_type": "Diesel", "volume_decimals": 5})[1])
+        p2, _ = core.save_pump({"name": "diesel 2", "fuel_type": "Diesel", "volume_decimals": 2})
+        self.assertEqual((p2["id"], p2["volume_decimals"], p2["amount_decimals"]), (p["id"], 2, 0))
 
-    def test_shift_check_two_pumps_and_carry_over(self):
+    def test_both_counters_gap_price_and_carry_over(self):
         d1, _ = core.save_pump({"name": "Diesel 1", "fuel_type": "Diesel"})
         d2, _ = core.save_pump({"name": "Diesel 2", "fuel_type": "Diesel"})
         core.save_pump({"name": "Premium 1", "fuel_type": "Premium"})  # not read: left out
-        core.save_sale({"fuel_type": "Diesel", "liters": "20", "price_per_liter": "57.40"})
-        core.save_reading(d1["id"], "open", "1000")
-        core.save_reading(d2["id"], "opening", "500")
-        c = core.pump_check(tolerance_pct="1")
-        self.assertEqual(c["groups"][0]["status"], "INCOMPLETE")
-        core.save_reading(d1["id"], "close", "1012")
-        core.save_reading(d2["id"], "closing", "510")
+        core.save_sale({"fuel_type": "Diesel", "liters": "20", "price_per_liter": "57.40"})  # P1,148.00
+        core.save_reading(d1["id"], "open", amount="500000", volume="1000")
+        core.save_reading(d2["id"], "opening", amount="200000")  # liters read later
+        core.save_reading(d2["id"], "opening", volume="500")
+        self.assertEqual(core.pump_check(tolerance_pct="1")["groups"][0]["status"], "INCOMPLETE")
+        core.save_reading(d1["id"], "close", amount="500689", volume="1012")  # 12 L, P689
+        core.save_reading(d2["id"], "closing", amount="200574", volume="510")  # 10 L, P574
         c = core.pump_check(tolerance_pct="1")
         g = c["groups"][0]
         self.assertEqual(len(c["groups"]), 1)
-        self.assertEqual((g["dispensed"], g["recorded"], g["gap"], g["status"]), ("22.000", "20.000", "2.000",
-                                                                                  "UNACCOUNTED"))
+        self.assertEqual((g["liters"]["dispensed"], g["liters"]["recorded"], g["liters"]["gap"]),
+                         ("22.000", "20.000", "2.000"))
+        self.assertEqual((g["pesos"]["dispensed"], g["pesos"]["recorded"], g["pesos"]["gap"], g["pesos"]["gap_pct"]),
+                         ("1263.00", "1148.00", "115.00", "9.11"))
+        self.assertEqual((g["status"], g["flag"]), ("UNACCOUNTED", True))
+        self.assertEqual((g["price"]["implied"], g["price"]["ok"]), ("57.41", True))  # 1263 / 22 = 57.409
         self.assertEqual([p["status"] for p in c["pumps"]], ["OK", "OK", "NONE"])
-        rec, errs, warns = core.save_reading(d2["id"], "close", "499")
+        rec, errs, warns = core.save_reading(d2["id"], "close", volume="499")
         self.assertEqual(errs, [])
         self.assertIn("lower than opening", warns[0])
-        self.assertEqual(core.pump_check()["groups"][0]["status"], "ERROR")
-        self.assertTrue(core.save_reading(d2["id"], "close", "abc")[1])
-        self.assertTrue(core.save_reading(d2["id"], "middle", "5")[1])
+        g = core.pump_check()["groups"][0]
+        self.assertEqual((g["status"], g["flag"]), ("ERROR", True))
+        self.assertTrue(core.save_reading(d2["id"], "close", amount="abc")[1])
+        self.assertTrue(core.save_reading(d2["id"], "close")[1])
+        self.assertTrue(core.save_reading(d2["id"], "middle", amount="5")[1])
         core.new_shift("Juan")
         c = core.pump_check()
-        self.assertEqual([(p["name"], p["opening"], p["opening_source"]) for p in c["pumps"][:2]],
-                         [("Diesel 1", "1012", "carried"), ("Diesel 2", "499", "carried")])
+        self.assertEqual([(p["name"], p["opening_amount"], p["opening_volume"], p["opening_amount_source"])
+                          for p in c["pumps"][:2]],
+                         [("Diesel 1", "500689", "1012", "carried"), ("Diesel 2", "200574", "499", "carried")])
+
+    def test_only_peso_counter_and_price_warning(self):
+        d, _ = core.save_pump({"name": "Diesel 2", "fuel_type": "Diesel"})
+        core.save_sale({"fuel_type": "Diesel", "liters": "100", "price_per_liter": "57.40"})  # P5,740
+        core.save_reading(d["id"], "open", amount="775397")
+        core.save_reading(d["id"], "close", amount="781137")  # P5,740
+        g = core.pump_check()["groups"][0]
+        self.assertEqual((g["status"], g["liters"], g["pesos"]["status"], g["price"]), ("OK", None, "OK", None))
+        core.save_reading(d["id"], "open", volume="13508")
+        core.save_reading(d["id"], "close", volume="13606")  # 98 L -> implied 58.57/L: price warning only
+        g = core.pump_check(tolerance_pct="5")["groups"][0]
+        self.assertEqual((g["status"], g["flag"]), ("OK", False))  # within 5%: no theft flag
+        self.assertEqual((g["price"]["implied"], g["price"]["ok"]), ("58.57", False))
+        self.assertEqual(len(core.pump_check(tolerance_pct="5")["price_warnings"]), 1)
+        self.assertEqual(core.set_price_change("Diesel", "57.40", "58.60"), [])
+        self.assertTrue(core.pump_check()["groups"][0]["price"]["ok"])
+        self.assertTrue(core.set_price_change("Diesel", "57.40", ""))
+        self.assertEqual(core.set_price_change("Diesel", "", ""), [])
+        self.assertFalse(core.pump_check()["groups"][0]["price"]["ok"])
+
+    def test_v1_single_counter_readings_migrate(self):
+        import sqlite3
+        conn = sqlite3.connect(core.DB_PATH)
+        conn.execute("INSERT INTO shifts (opened_at) VALUES ('2026-10-09 06:00:00')")
+        conn.execute("INSERT INTO pumps (name, fuel_type, unit, decimals, created_at) VALUES ('Diesel 2', 'Diesel', 'PHP', 0, 'x')")
+        conn.execute("INSERT INTO pump_readings (shift_id, pump_id, kind, reading, source, created_at) "
+                     "VALUES (1, 1, 'open', '775397', 'photo', 'x')")
+        conn.execute("INSERT INTO pump_readings (shift_id, pump_id, kind, reading, source, created_at) "
+                     "VALUES (1, 1, 'close', '775400', 'seed', 'x')")  # old demo rows are re-seeded, not migrated
+        conn.commit()
+        conn.close()
+        core.init_db()
+        r = core.rows("SELECT * FROM totalizer_readings")
+        self.assertEqual([(x["kind"], x["amount"], x["volume"]) for x in r], [("open", "775397", None)])
 
     def test_tolerance_setting(self):
         self.assertEqual(core.pump_tolerance(), Decimal("0.5"))

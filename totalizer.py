@@ -4,14 +4,20 @@ A totalizer is the pump's lifetime counter (it never resets per sale). Staff pho
 (OPENING) and shift end (CLOSING); PumpLocal computes dispensed = closing - opening in core.py.
 
 Input: OCR lines [{"text", "x", "y", "w", "h"}] (boxes optional) or plain strings.
-Output: {"reading": "775397", "pump_name": "Diesel 2", "fuel_type": "Diesel", "unit_hint": "L", ...}
+Output: {"amount": "775397", "volume": None, "pump_name": "Diesel 2", "fuel_type": "Diesel", ...}
+
+A pump has TWO running totalizers: the PESO counter ("Money", amount) and the LITER counter ("Volume").
+Both are read as whole numbers as displayed; hidden decimals, if any, are set per pump in core.py.
 
 How the reading is found:
   1. Menu numbers such as the "2." in "2.Money All", dates, times and the number in a pump label
      ("DIESEL 2", "PUMP 3") are removed first.
   2. Numbers on a line with a totalizer label (Volume/Vol/Total/Money/Amount/Liters/Qty) win; then numbers
      right next to (or just below) such a label; then any other number with 3+ digits.
-  3. Within the best group, the LARGEST number is the reading (a totalizer is a big counter).
+  3. Within the best group, the LARGEST number on each line is that line's counter (a totalizer is big).
+  4. Which counter: a menu title like "2.Money All" decides when the screen shows one counter (the station
+     owner confirmed 775397 under "2.Money All" is the peso counter, even though the line reads "Volume");
+     otherwise each line's own label (Money/Amount -> pesos, Volume/Liters -> liters).
 The reading keeps the digits exactly as shown; hidden decimal places are applied per pump in core.py.
 """
 import re
@@ -132,15 +138,53 @@ def parse(lines):
         for value, digits in nums:
             if tier == 2 and len(digits.replace(".", "")) < 3:
                 continue  # short unlabelled numbers are menu items, button numbers, etc.
-            cands.append((tier, -value, cost or 0.0, digits, word))
+            cands.append((tier, -value, cost or 0.0, digits, word, i))
+    screen = screen_kind(lines)
+    out = {"amount": None, "volume": None, "unassigned": None, "pump_name": name, "fuel_type": fuel,
+           "screen": screen, "confidence": "none", "notes": []}
     if not cands:
-        return {"reading": None, "value": None, "pump_name": name, "fuel_type": fuel, "unit_hint": None,
-                "label": None, "confidence": "none", "notes": ["No totalizer number found in the photo text."]}
-    cands.sort(key=lambda c: (c[0], c[1], c[2]))
-    tier, negv, _, digits, word = cands[0]
-    notes = []
-    if tier == 2:
-        notes.append("No Volume/Total label found next to the number; used the largest number. Please check it.")
-    conf = ("labelled", "nearby", "guess")[tier]
-    return {"reading": digits, "value": str(-negv), "pump_name": name, "fuel_type": fuel,
-            "unit_hint": _unit_of(word), "label": word, "confidence": conf, "notes": notes}
+        out["notes"].append("No totalizer number found in the photo text.")
+        out["reading"] = None
+        return out
+    best_tier = min(c[0] for c in cands)
+    cands = sorted((c for c in cands if c[0] == best_tier), key=lambda c: (c[1], c[2]))
+    out["confidence"] = ("labelled", "nearby", "guess")[best_tier]
+    per_line = {}
+    for c in cands:  # the largest number on each line is that line's counter
+        per_line.setdefault(c[5], c)
+    counters = sorted(per_line.values(), key=lambda c: c[5])
+    if best_tier == 2:
+        out["notes"].append("No Money/Volume label found next to the number; used the largest number. Please check it.")
+        counters = counters[:1]
+    if len(counters) == 1 and screen:
+        # One counter on screen: the menu title decides (on Johnny's pump the money counter is shown under
+        # "2.Money All" even though its line reads "Volume").
+        out[screen] = counters[0][3]
+        out["notes"].append("Screen title says %s, so this is the %s totalizer." % (
+            "Money" if screen == "amount" else "Volume", "peso" if screen == "amount" else "liter"))
+    else:
+        for c in counters:
+            kind = {"L": "volume", "PHP": "amount"}.get(_unit_of(c[4]))
+            if kind and out[kind] is None:
+                out[kind] = c[3]
+            elif out["unassigned"] is None:
+                out["unassigned"] = c[3]
+        if out["unassigned"] and not (out["amount"] or out["volume"]):
+            out["notes"].append("Could not tell if %s is the peso or the liter totalizer. Please choose."
+                                % out["unassigned"])
+    out["reading"] = out["amount"] or out["volume"] or out["unassigned"]
+    return out
+
+
+MENU_TITLE = re.compile(r"^\W*\d{1,2}\s*[.)]\s*([A-Za-z]+)")
+
+
+def screen_kind(lines):
+    """Menu title such as '2.Money All' -> 'amount', '1.Volume All' -> 'volume', else None."""
+    for ln in lines:
+        m = MENU_TITLE.match(_text(ln).strip())
+        if m:
+            k = {"L": "volume", "PHP": "amount"}.get(_unit_of(m.group(1)))
+            if k:
+                return k
+    return None
