@@ -20,7 +20,7 @@ This is a plain account of how I built PumpLocal for the hackathon: what I used,
 - **Me (Johnny):** the idea and the real-world requirements from running the station; the real pump photo; testing every build on my Mac; reporting what broke and how fast it ran; every product decision.
 - **Grok Bot (AI coding assistant):** wrote essentially all of the code, tests and docs, following my direction.
 - **Claude:** used only for Mac cleanup during the hackathon, for two things: stopping the background processes of another local app of mine (Creative Video Studio), and clearing the ~1.6 GB Playwright cache. It wrote **no** PumpLocal code.
-- **Devin:** not used so far. If that changes, I'll add it here.
+- **Devin:** a Devin task was prepared to add pump readings to the sync queue, delivered as a pull request. **Status: pending.** I'll update this line if it's merged. Until then, Devin has contributed no merged code.
 
 ## Problems I hit, in order
 
@@ -41,6 +41,12 @@ These happened on my 8 GB MacBook Air after the first version of the app ran (be
 5. **The key pivot:** read photos with **Apple Vision OCR** (built into macOS) and turn the text into numbers with plain code. Gemma is now only the fallback for photos and does the chat and the short explanations.
 
 After the pivot, photo reads took a few seconds on my Mac.
+
+### Later: the Mac got laggy (about 3:53 PM PHT)
+
+- **Problem:** during development, the MacBook Air got laggy, and even typing lagged. The `gemma3:4b` model was still loaded in memory by Ollama while other apps were open.
+- **Fix:** stop the app in its terminal (Ctrl+C), then run `ollama stop gemma3:4b` to unload the model when I'm not demoing. It loads again automatically on the next AI request, or at the warm-up when the app starts.
+- **Note for 8 GB machines:** unload the model when you're not using it.
 
 ## Timeline
 

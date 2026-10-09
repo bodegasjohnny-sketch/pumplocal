@@ -131,7 +131,7 @@ If Ollama isn't running, the app still works. On a Mac, photos are still read by
 
 - **AI coding assistant:** Grok Bot wrote essentially all of the code, tests and docs from my direction. I (Johnny) supplied the real-world requirements and the real photo, tested every build on my 8 GB MacBook Air, and made all the decisions.
 - **Claude:** used only for Mac cleanup (stopping another local app's background processes and clearing the Playwright cache). It wrote no PumpLocal code.
-- **Devin:** not used so far.
+- **Devin:** a task to add pump readings to the sync queue was prepared as a pull request. It's pending, with no Devin code merged yet.
 - **AI inside the app:** both models run on-device (see below). AI only reads photos and writes short explanations. All math is done in code.
 - Details and the timeline: [BUILD_LOG.md](BUILD_LOG.md).
 
