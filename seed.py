@@ -96,5 +96,35 @@ def seed(reset=False):
     return True
 
 
+# ---- Demo Day: an EMPTY shift, so everything on screen comes from the photos read live (see DEMO_SCRIPT.md).
+DEMO_DAY_FLOAT = "1000.00"
+DEMO_DAY_OPENING = {"amount": "775397", "volume": "13508"}  # 775397 = the REAL photo; 13508 is demo data
+
+
+def seed_demo_empty():
+    """Fresh database: one open shift with the opening float, posted prices and the Diesel 2 OPENING totalizers
+    preset. No sales, expenses, credit or cash checks."""
+    if os.path.exists(core.DB_PATH):
+        os.remove(core.DB_PATH)
+    core.init_db()
+    sid = core.execute("INSERT INTO shifts (opened_at, attendant) VALUES (?, ?)",
+                       (datetime.now().replace(second=0, microsecond=0).strftime("%Y-%m-%d %H:%M:%S"), "Demo Day"))
+    core.set_setting("opening_float:%s" % sid, DEMO_DAY_FLOAT)
+    for fuel, price in DEMO_PRICES.items():
+        core.set_setting("price:%s" % fuel, price)
+    pump, errors = core.save_pump(DEMO_PUMP)
+    assert not errors, errors
+    rec, errors, _ = core.save_reading(pump["id"], "open", DEMO_DAY_OPENING["amount"], DEMO_DAY_OPENING["volume"],
+                                       "manual", shift_id=sid)
+    assert not errors, errors
+    print("Demo Day shift #%d ready: no sales yet. Opening float %s; prices %s; Diesel 2 opening: peso %s, liter %s."
+          % (sid, core.peso(DEMO_DAY_FLOAT), ", ".join("%s %s" % (f, core.peso(p)) for f, p in DEMO_PRICES.items()),
+             DEMO_DAY_OPENING["amount"], DEMO_DAY_OPENING["volume"]))
+    return sid
+
+
 if __name__ == "__main__":
-    seed(reset="--reset" in sys.argv)
+    if "--demo-empty" in sys.argv:
+        seed_demo_empty()
+    else:
+        seed(reset="--reset" in sys.argv)

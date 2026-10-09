@@ -369,8 +369,9 @@ def new_shift(attendant=""):
 
 
 def last_price(fuel):
+    """Price of the last sale of this fuel; else the posted price set for the shift (seed.py --demo-empty)."""
     r = rows("SELECT price_per_liter FROM sales WHERE fuel_type=? AND voided=0 ORDER BY id DESC LIMIT 1", (fuel,))
-    return r[0]["price_per_liter"] if r else None
+    return r[0]["price_per_liter"] if r else get_setting("price:%s" % fuel)
 
 
 def save_sale(data, shift_id=None, created_at=None):
@@ -465,6 +466,7 @@ def shift_summary(shift_id=None):
         "total_amount": str(q2(total_amount)), "total_liters": str(q3(total_liters)),
         "sales": list(reversed(sales)), "last_cash_check": checks[0] if checks else None,
         "pump_check": pump_check(shift["id"]),
+        "opening_float_preset": get_setting("opening_float:%s" % shift["id"]),
     }
 
 
