@@ -1,0 +1,47 @@
+"""Load a realistic demo shift so the demo works immediately.
+
+Run:  python3 seed.py          (only seeds if the database is empty)
+      python3 seed.py --reset  (wipes local data and seeds again)
+
+Prices are demo values for this hackathon, not live pump prices.
+"""
+import os
+import sys
+from datetime import datetime, timedelta
+
+import core
+
+DEMO_PRICES = {"Premium": "64.99", "Unleaded": "61.25", "Diesel": "57.40"}
+
+# (minutes after shift start, fuel, peso amount). Liters are computed in code from pesos / price.
+DEMO_SALES = [
+    (8, "Unleaded", "500"), (15, "Diesel", "1000"), (22, "Premium", "1000"), (31, "Diesel", "2500"),
+    (40, "Unleaded", "200"), (47, "Premium", "300"), (55, "Diesel", "1500"), (63, "Unleaded", "1000"),
+    (71, "Diesel", "3000"), (80, "Premium", "500"), (92, "Unleaded", "150"), (104, "Diesel", "800"),
+    (118, "Premium", "2000"), (131, "Unleaded", "700"), (145, "Diesel", "1200"),
+]
+
+
+def seed(reset=False):
+    if reset and os.path.exists(core.DB_PATH):
+        os.remove(core.DB_PATH)
+    core.init_db()
+    if not core.is_empty():
+        print("Database already has data; not seeding. Use --reset to start over.")
+        return False
+    start = datetime.now().replace(minute=0, second=0, microsecond=0) - timedelta(hours=3)
+    sid = core.execute("INSERT INTO shifts (opened_at, attendant) VALUES (?, ?)",
+                       (start.strftime("%Y-%m-%d %H:%M:%S"), "Demo Attendant"))
+    for minutes, fuel, amount in DEMO_SALES:
+        when = (start + timedelta(minutes=minutes)).strftime("%Y-%m-%d %H:%M:%S")
+        rec, errors, _ = core.save_sale({"fuel_type": fuel, "price_per_liter": DEMO_PRICES[fuel],
+                                         "amount_pesos": amount, "source": "seed"}, shift_id=sid, created_at=when)
+        assert not errors, errors
+    s = core.shift_summary(sid)
+    print("Seeded demo shift #%d: %d sales, %s, %s L" % (sid, s["count"], core.peso(s["total_amount"]),
+                                                        s["total_liters"]))
+    return True
+
+
+if __name__ == "__main__":
+    seed(reset="--reset" in sys.argv)
