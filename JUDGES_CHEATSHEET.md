@@ -147,10 +147,13 @@ percent       = difference ÷ expected × 100
    Two places, both local. (1) **Reading photos:** Apple Vision OCR reads meters, receipts, totalizers and the closing slip, with Gemma 3 4B as the fallback reader. (2) **Free-form chat:** typed questions like "Bakit hindi tugma ang diesel?" are answered by Gemma from the shift's computed numbers. The fixed questions (the chips) are answered by code on purpose, for accuracy: when I tested on my Mac, Gemma garbled some numbers. All the math is always code.
 
 10. **"Who wrote the code?"**
-   Grok Bot, an AI coding assistant, wrote essentially all of it from my direction. I supplied the station's real problems and photos, tested on my Mac, and made the decisions. Devin was tried but had no credits left, so it wrote nothing. Claude only helped clean up my Mac. All of this is in `BUILD_LOG.md`.
+   Grok Bot, an AI coding assistant, wrote essentially all of it from my direction. I supplied the station's real problems and photos, tested on my Mac, and made the decisions. Devin was tried but had no credits left, so it wrote nothing. Claude (Claude Code) wrote no PumpLocal code; it installed Ollama and cleaned up my Mac (disk space, background processes). All of this is in `BUILD_LOG.md`.
 
 11. **"How do you know it works?"**
     There are 169 automated tests (`MOCK_AI=1 python3 -m unittest discover -s tests`). They start the real server, call every endpoint, and test the parsers, the math, sync (with a fake server), a fake Ollama, and Ollama being down. **Caveat:** the tests run on Linux, so Apple Vision itself is replaced by a stand-in that returns recorded OCR text. The real Vision path has only been tried by hand on my Mac.
+
+12. **"Was Ollama or the model installed before the hackathon?"**
+    No. Claude installed Ollama at 1:38 PM on Oct 9, and I pulled `gemma3:4b` at 2:14 PM, both after the 1:00 PM kickoff. The first PumpLocal commit was at 2:10 PM. The timeline is in `BUILD_LOG.md`.
 
 ### If they push further
 

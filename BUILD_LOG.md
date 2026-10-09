@@ -25,7 +25,7 @@ This is a plain account of how I built PumpLocal for the hackathon: what I used,
 
 - **Me (Johnny):** the idea and the real-world requirements from running the station; the real pump photo; testing every build on my Mac; reporting what broke and how fast it ran; every product decision.
 - **Grok Bot (AI coding assistant):** wrote essentially all of the code, tests and docs, following my direction.
-- **Claude:** used only for Mac cleanup during the hackathon, for two things: stopping the background processes of another local app of mine (Creative Video Studio), and clearing the ~1.6 GB Playwright cache. It wrote **no** PumpLocal code.
+- **Claude (Claude Code):** used for Mac setup and cleanup during the hackathon: installing Ollama (1:38 PM), stopping the background processes of another local app of mine (Creative Video Studio), and clearing the ~1.6 GB Playwright cache. It also pulled a Qwen2.5 3B model, which PumpLocal does not use. During the briefing I also chatted with it about app ideas, but I never followed up on that chat. It wrote **no** PumpLocal code.
 - **Devin:** I tried it. I installed the Devin GitHub app for the pumplocal repo only and prepared a task to add pump readings to the sync queue. The free credits had already run out, so Devin wrote **no** code. Grok Bot built the pump sync instead.
 
 ## Problems I hit, in order
@@ -34,6 +34,13 @@ These happened on my 8 GB MacBook Air after the first version of the app ran (be
 
 1. **The first photo read took over 4 minutes and timed out.** `gemma3:4b` through Ollama was reading the pump photo, and it was far too slow on this machine.
 2. **The Mac was low on disk,** with about 971 MB free. I cleaned up: I removed old installer (`.dmg`) files from Downloads, and Claude cleared the ~1.6 GB Playwright cache. Free space went from about 8.4 GB to about 10 GB. It stayed around 8–10 GB after that.
+
+   **Setup timeline (Oct 9, PHT).** Nothing below was installed before the 1:00 PM kickoff.
+   - 1:38 PM: Claude (Claude Code) installed Ollama 0.40.1 with Homebrew and started its background service.
+   - 1:43 PM: Claude pulled Qwen2.5 3B. PumpLocal does not use it.
+   - 2:10 PM: Grok Bot made the first PumpLocal commit.
+   - 2:14 PM: I pulled `gemma3:4b` in Terminal, following Grok Bot's setup steps.
+
 3. **Port 8080 was already taken.** Another local app of mine (Creative Video Studio) was using `localhost:8080`. Fix: PumpLocal now defaults to `127.0.0.1:8080`.
 4. **Background workers were eating RAM.** That same studio app had background workers running. Claude stopped them.
 5. **Even a text-only question took about 220 seconds.** This showed the real problem was memory pressure on 8 GB, not the photo itself.
