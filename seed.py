@@ -139,6 +139,7 @@ def seed_demo_empty():
                                         created_at=(start + timedelta(minutes=minutes)).strftime("%Y-%m-%d %H:%M:%S"))
         assert not errors, errors
     s = core.shift_summary(sid)
+    print("Station: %s" % core.STATION)
     print("Demo Day shift #%d ready. Opening float %s; prices %s." % (
         sid, core.peso(DEMO_DAY_FLOAT), ", ".join("%s %s" % (f, core.peso(p)) for f, p in DEMO_PRICES.items())))
     print("Premium logbook batch (SAMPLE sales): %d sales, %s, %s L. Pump Premium 3: no readings yet (read the 4 REAL "

@@ -274,6 +274,23 @@ class Handler(BaseHTTPRequestHandler):
         return self.send_json({"error": "not found"}, 404)
 
 
+def lan_ip():
+    """This computer's Wi-Fi/LAN address for the phone URL. A UDP 'connect' sends no packets; it just picks the
+    interface. Returns None if there is no network."""
+    import socket
+    for target in ("10.255.255.255", "8.8.8.8"):
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect((target, 1))
+            ip = s.getsockname()[0]
+            s.close()
+            if ip and not ip.startswith("127."):
+                return ip
+        except OSError:
+            pass
+    return None
+
+
 def main():
     core.init_db()
     if core.is_empty():
@@ -288,6 +305,10 @@ def main():
     url = "http://127.0.0.1:%d" % PORT
     a = ai.status(force=True)
     print("PumpLocal running at %s" % url)
+    if HOST == "0.0.0.0":
+        ip = lan_ip()
+        print("  On your phone (same Wi-Fi): http://%s:%d" % (ip, PORT) if ip else
+              "  On your phone (same Wi-Fi): http://<this Mac's Wi-Fi IP>:%d (System Settings > Wi-Fi > Details)" % PORT)
     print("  Local AI: %s (%s)" % (a["detail"], core.MODEL))
     print("  Photo reader: READER=%s" % core.READER)
     print("  Cloud sync: %s" % sync.status()["label"])

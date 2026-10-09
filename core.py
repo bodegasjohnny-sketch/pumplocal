@@ -17,7 +17,7 @@ OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434").rstrip("/")
 MODEL = os.environ.get("MODEL", "gemma3:4b")
 MOCK_AI = os.environ.get("MOCK_AI", "0") == "1"
 DB_PATH = os.environ.get("DB_PATH", os.path.join(HERE, "pumplocal.db"))
-STATION = os.environ.get("STATION_NAME", "Demo Station")
+STATION = os.environ.get("STATION_NAME", "JCB Gas Station · Sto. Niño, South Cotabato")
 AI_TIMEOUT = float(os.environ.get("AI_TIMEOUT", "600"))
 # Short timeout for the header status check; a timeout during inference counts as "busy".
 STATUS_TIMEOUT = float(os.environ.get("STATUS_TIMEOUT", "1.5"))
