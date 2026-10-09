@@ -169,6 +169,16 @@ class MockFlowTest(unittest.TestCase):
         self.assertEqual((code, png[:4]), (200, b"\x89PNG"))
         self.assertEqual(call(self.b, "/samples/../app.py")[0], 404)
 
+    def test_1b_slides_page(self):
+        code, html = call(self.b, "/slides")
+        self.assertEqual(code, 200)
+        html = html.decode()
+        self.assertIn("Go to live demo", html)
+        self.assertIn('href="/"', html)
+        for bad in ("http://", "https://", "<link rel=\"stylesheet\"", "<script src", "@import", "url(http"):
+            self.assertNotIn(bad, html.replace("http://www.w3.org/2000/svg", ""), "external resource: " + bad)
+        self.assertIn('href="/slides"', call(self.b, "/")[1].decode())
+
     def test_2_autoseed_and_offline_status(self):
         code, st = call(self.b, "/api/status")
         self.assertTrue(st["ai"]["ok"] and st["ai"]["mock"])

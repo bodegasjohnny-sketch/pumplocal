@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PumpLocal · Pitch</title>
+<!-- Offline pitch deck: no CDN, no external fonts. Arrows / Space / click to advance, F for fullscreen. -->
+<style>
+  :root { --navy:#0b2545; --navy2:#13315c; --red:#e63946; --yellow:#ffb703; --green:#2a9d8f;
+    --bg:#eef2f7; --ink:#1b263b; --muted:#5c677d; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:#050d1a; overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  /* 16:9 stage, scaled to fit the window; all sizes inside are in stage units (1600x900) */
+  #stage { position:absolute; left:50%; top:50%; width:1600px; height:900px; transform-origin:center center;
+    background:var(--bg); color:var(--ink); border-radius:6px; overflow:hidden; cursor:pointer; }
+  .slide { position:absolute; inset:0; display:none; flex-direction:column; }
+  .slide.active { display:flex; }
+  .bar { background:linear-gradient(135deg,var(--navy),var(--navy2)); color:#fff; border-bottom:8px solid var(--yellow);
+    padding:28px 56px; display:flex; align-items:center; gap:22px; }
+  .bar svg { width:64px; height:64px; flex:none; }
+  .bar .brand { font-size:34px; font-weight:800; letter-spacing:.5px; }
+  .bar .brand span { color:var(--yellow); }
+  .bar .who { margin-left:auto; font-size:24px; opacity:.85; text-align:right; }
+  .body { flex:1; padding:48px 72px; display:flex; gap:56px; align-items:center; }
+  h1 { font-size:72px; margin:0 0 28px; color:var(--navy); line-height:1.05; }
+  h1 em { font-style:normal; color:var(--red); }
+  ul { list-style:none; padding:0; margin:0; }
+  li { font-size:38px; margin:0 0 22px; padding-left:58px; position:relative; line-height:1.2; }
+  li::before { content:attr(data-i); position:absolute; left:0; top:0; font-size:36px; }
+  .col { flex:1; }
+  .slot { width:560px; height:620px; flex:none; border-radius:24px; overflow:hidden; position:relative;
+    background:repeating-linear-gradient(-8deg,#fffdf4 0 46px,#c9d6ea 46px 48px); box-shadow:0 6px 30px rgba(11,37,69,.18); }
+  .slot img { width:100%; height:100%; object-fit:cover; display:block; }
+  .slot img[hidden] { display:none; }
+  .slot .ph { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; align-items:center;
+    gap:16px; filter:blur(.6px); color:#5a6b86; font:italic 34px "Bradley Hand","Segoe Print","Comic Sans MS",cursive; }
+  .slot .ph s { opacity:.55; }
+  .slot .cap { position:absolute; left:0; right:0; bottom:0; background:rgba(11,37,69,.85); color:#fff;
+    font:600 22px -apple-system,"Segoe UI",sans-serif; padding:14px 20px; filter:none; }
+  .tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:28px; width:100%; }
+  .tile { background:#fff; border-radius:24px; padding:34px; box-shadow:0 4px 18px rgba(11,37,69,.10); border-top:10px solid var(--green); }
+  .tile.r { border-top-color:var(--red); } .tile.y { border-top-color:var(--yellow); }
+  .tile b { display:block; font-size:40px; color:var(--navy); margin:12px 0 10px; }
+  .tile p { font-size:28px; color:var(--muted); margin:0; line-height:1.3; }
+  .tile .ic { font-size:64px; }
+  .foot { font-size:28px; color:var(--navy); margin-top:30px; background:#fff; border-radius:16px; padding:20px 28px; }
+  .foot b { color:var(--red); }
+  .jump { align-items:center; justify-content:center; text-align:center; background:linear-gradient(135deg,var(--navy),var(--navy2)); color:#fff; }
+  .wifi { display:inline-block; background:var(--red); color:#fff; font-size:56px; font-weight:900; padding:16px 44px;
+    border-radius:999px; letter-spacing:2px; margin-bottom:40px; }
+  .go { display:inline-block; background:var(--yellow); color:var(--navy); font-size:84px; font-weight:900; text-decoration:none;
+    padding:40px 90px; border-radius:40px; box-shadow:0 10px 40px rgba(255,183,3,.35); }
+  .go:hover { filter:brightness(1.07); }
+  .sub { font-size:30px; opacity:.8; margin-top:34px; }
+  #nav { position:absolute; right:28px; bottom:20px; font-size:22px; color:var(--muted); }
+  #hint { position:fixed; left:12px; bottom:8px; color:#8a97ad; font-size:12px; }
+  :fullscreen #hint { display:none; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <!-- 1. Problem (title lives small in the bar) -->
+  <section class="slide active" data-n="1">
+    <div class="bar">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect x="8" y="6" width="32" height="52" rx="5" fill="#e63946"/><rect x="13" y="12" width="22" height="14" rx="2" fill="#fff"/><text x="24" y="23" font-size="9" text-anchor="middle" font-family="monospace" fill="#0b2545">AI</text><rect x="13" y="32" width="22" height="4" rx="2" fill="#ffb703"/><path d="M40 20h6l7 9v19a4 4 0 0 1-8 0V36h-5" stroke="#ffb703" stroke-width="4" fill="none" stroke-linecap="round"/></svg>
+      <div class="brand">Pump<span>Local</span> <small style="font-size:22px;font-weight:400;opacity:.8">· offline AI for gas stations</small></div>
+      <div class="who">Johnny Bodegas<br><small>AppBuildersPH Hackathon</small></div>
+    </div>
+    <div class="body">
+      <div class="col">
+        <h1>The owner can't <em>see</em> the shift.</h1>
+        <ul>
+          <li data-i="🏠">Owner in Tagaytay</li>
+          <li data-i="⛽">Station in Sto. Niño, South Cotabato</li>
+          <li data-i="📝">Handwritten closing sheets</li>
+          <li data-i="❓">Shortages nobody can explain</li>
+          <li data-i="📶">No reliable internet</li>
+        </ul>
+      </div>
+      <div class="slot" id="sheetSlot">
+        <img id="sheetImg" alt="Handwritten closing sheet (blurred)" hidden>
+        <div class="ph" id="sheetPh"><span>Closing — Diesel 2</span><s>████████</s><span>Opening ▒▒▒▒▒</span><span>Closing ▒▒▒▒▒</span><span>Cash ₱ ▒▒,▒▒▒</span><s>██████</s></div>
+        <div class="cap">Today: a handwritten sheet (blurred)</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Why local AI -->
+  <section class="slide" data-n="2">
+    <div class="body" style="flex-direction:column;align-items:stretch;justify-content:center">
+      <h1>Why <em>local</em> AI?</h1>
+      <div class="tiles">
+        <div class="tile"><div class="ic">📴</div><b>Works offline</b><p>Brownout or dead signal? The shift still closes.</p></div>
+        <div class="tile y"><div class="ic">🔒</div><b>Data stays here</b><p>Sales and cash never leave the station.</p></div>
+        <div class="tile r"><div class="ic">₱0</div><b>No cloud cost</b><p>No per-use fees on thin fuel margins.</p></div>
+      </div>
+      <div class="foot">On an <b>8 GB Mac</b>: Apple Vision OCR reads a photo in about a second · Gemma 3 4B via Ollama writes the Taglish answers.</div>
+    </div>
+  </section>
+
+  <!-- 3. What's next -->
+  <section class="slide" data-n="3">
+    <div class="body" style="flex-direction:column;align-items:stretch;justify-content:center">
+      <h1>What's <em>next</em></h1>
+      <ul>
+        <li data-i="🔄">Sync to the owner when the internet is back</li>
+        <li data-i="📒">Utang ledger: who owes, who paid</li>
+        <li data-i="⛽">Per-nozzle tracking</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Final jump -->
+  <section class="slide jump" data-n="4">
+    <div class="wifi">📴 Wi-Fi OFF</div><br>
+    <a class="go" href="/" id="goDemo">Go to live demo →</a>
+    <div class="sub">Everything you'll see runs on this laptop.</div>
+  </section>
+
+  <div id="nav"></div>
+</div>
+<div id="hint">← → or click to move · F = fullscreen</div>
+<script>
+(function () {
+  var slides = document.querySelectorAll('.slide'), i = 0, stage = document.getElementById('stage');
+  var nav = document.getElementById('nav');
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    for (var k = 0; k < slides.length; k++) slides[k].classList.toggle('active', k === i);
+    nav.textContent = (i + 1) + ' / ' + slides.length;
+    nav.style.color = i === slides.length - 1 ? '#fff' : '';
+    if (location.hash !== '#' + (i + 1)) history.replaceState(null, '', '#' + (i + 1));
+  }
+  function fit() {
+    var s = Math.min(window.innerWidth / 1600, window.innerHeight / 900);
+    stage.style.transform = 'translate(-50%,-50%) scale(' + s + ')';
+  }
+  function fullscreen() {
+    var d = document;
+    if (d.fullscreenElement) { d.exitFullscreen && d.exitFullscreen(); }
+    else if (d.documentElement.requestFullscreen) { d.documentElement.requestFullscreen(); }
+  }
+  document.addEventListener('keydown', function (e) {
+    var k = e.key;
+    if (k === 'ArrowRight' || k === 'ArrowDown' || k === ' ' || k === 'PageDown' || k === 'Enter') {
+      if (k === 'Enter' && i === slides.length - 1) { location.href = '/'; return; }
+      e.preventDefault(); show(i + 1);
+    } else if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp' || k === 'Backspace') { e.preventDefault(); show(i - 1); }
+    else if (k === 'Home') show(0);
+    else if (k === 'End') show(slides.length - 1);
+    else if (k === 'f' || k === 'F') fullscreen();
+  });
+  stage.addEventListener('click', function (e) {
+    if (e.target.closest('a')) return;            // the demo button navigates
+    show(e.clientX < window.innerWidth * 0.25 ? i - 1 : i + 1);
+  });
+  // Optional real (blurred) photo: samples/handwritten_blurred.jpg. Falls back to the styled placeholder.
+  var img = document.getElementById('sheetImg');
+  img.onload = function () { img.hidden = false; document.getElementById('sheetPh').style.display = 'none'; };
+  img.src = '/samples/handwritten_blurred.jpg';
+  window.addEventListener('resize', fit);
+  fit();
+  show((parseInt(location.hash.slice(1), 10) || 1) - 1);
+})();
+</script>
+</body>
+</html>

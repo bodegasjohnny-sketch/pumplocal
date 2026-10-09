@@ -31,6 +31,7 @@
   .dot.on { background:#4ade80; box-shadow:0 0 6px #4ade80; } .dot.off { background:#f87171; } .dot.warn { background:var(--yellow); }
   .syncbtn { margin-left:auto; background:var(--yellow); color:var(--navy); border:0; font-weight:700; border-radius:999px;
     padding:7px 14px; font-size:13px; cursor:pointer; }
+  .slideslink { color:#fff; opacity:.7; font-size:12px; text-decoration:underline; }
   main { max-width:760px; margin:0 auto; padding:14px; }
   .tab { display:none; } .tab.active { display:block; }
   .card { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px; margin-bottom:14px; }
@@ -142,6 +143,7 @@
     <span class="pill" id="aiPill" title="Local AI on this computer: Apple Vision OCR (photos) + Gemma via Ollama"><span class="dot" id="aiDot"></span><span id="aiLabel">Local AI…</span></span>
     <span class="pill" title="Cloud sync (the only part that needs internet)"><span class="dot" id="netDot"></span><span id="netLabel">Checking…</span></span>
     <button class="syncbtn" id="syncBtn">⟳ Sync</button>
+    <a class="slideslink" href="/slides" title="Pitch slides (offline)">Slides</a>
   </div>
 </header>
 

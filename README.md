@@ -71,6 +71,13 @@ For the demo, try the sample thumbnails on the Photo tab, check the Shift tab, o
 
 A database created before the Pump feature gets the Diesel 2 demo pump automatically, as long as its open shift is still the seeded demo shift. Otherwise run `python3 seed.py --reset` (this wipes local data).
 
+### Pitch slides (offline)
+
+Open **http://localhost:8080/slides**, or use the small "Slides" link in the app header. The deck is a single static page (`static/slides.html`) with no CDN or external fonts, so it works with Wi-Fi off. It has three short slides (Problem, Why local AI, What's next) and a final **"Go to live demo"** button that opens the app.
+
+- **Controls:** → / Space / click to advance, ← to go back, **F** for fullscreen. The deck is 16:9 and scales to any screen.
+- **Optional photo:** to show a blurred photo of a handwritten closing sheet on slide 1, save it as `samples/handwritten_blurred.jpg`. Blur all names and signatures first. Without the file, a styled placeholder is shown.
+
 ### Configuration (environment variables)
 
 | Variable | Default | Purpose |
@@ -141,7 +148,7 @@ totalizer.py  OCR lines -> peso/liter totalizer readings + pump label in code
 ocr/          ocr.swift (Apple Vision OCR helper; binary is built on first run)
 sync.py       Offline queue + SYNC_URL uploader
 seed.py       Demo shift loader
-static/       index.html (single page, inline CSS/JS)
+static/       index.html (single page, inline CSS/JS), slides.html (offline pitch deck at /slides)
 samples/      Synthetic meter/receipt images + generator, one REAL totalizer photo
 tests/        Unit + end-to-end tests
 ```

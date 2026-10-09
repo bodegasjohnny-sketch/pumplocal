@@ -81,13 +81,15 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         if path in ("/", "/index.html"):
             return self.send_file(os.path.join(STATIC, "index.html"))
+        if path in ("/slides", "/slides/", "/slides.html"):
+            return self.send_file(os.path.join(STATIC, "slides.html"))
         if path.startswith("/samples/"):
             name = os.path.basename(path)
             return self.send_file(os.path.join(SAMPLES, name))
         if path == "/api/samples":
             files = sorted(f for f in os.listdir(SAMPLES) if f.lower().endswith((".png", ".jpg")))
             pump = [f for f in files if "totalizer" in f.lower()]
-            other = [f for f in files if f.lower().startswith("closing_sheet")]
+            other = [f for f in files if f.lower().startswith(("closing_sheet", "handwritten"))]
             # "samples" = sale photos (Photo tab); "pump_samples" = totalizer photos (Pump tab);
             # "other_samples" = e.g. the closing-sheet form images (not a single sale)
             return self.send_json({"samples": [f for f in files if f not in pump and f not in other],
