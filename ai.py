@@ -468,7 +468,7 @@ SLIP_PROMPT = (
 MOCK_SLIP = ('Here is the text:\n```json\n{"lines": ["JCB SHIFT CLOSING SLIP", "DATE 09 OCT 2026", "SHIFT 6AM - 2PM", '
              '"OPENING FLOAT 1,000.00", "EXPENSES", "ICE AND WATER 60.00", "NOZZLE O-RING 350.00", "DISCOUNTS 20.00", '
              '"CREDIT / UTANG", "MANG BEN - DIESEL 945.00", "GCASH 500.00", "CARD 300.00", '
-             '"CASH COUNTED 3,263.20"]}\n```')
+             '"CASH COUNTED 39,169.55"]}\n```')
 
 
 def _slip_result(p, raw, seconds, reader, source):
@@ -657,7 +657,7 @@ def summary_context(s):
         # readings are NOT given to the model: it mixed up "13540" (a counter) with liters dispensed.
         lines.append("Pump meters (fuel dispensed this shift vs recorded sales; tolerance %s%%):" % p["tolerance_pct"])
         for r in p["pumps"]:
-            if r["status"] == "NONE":
+            if r["status"] == "NONE" or r.get("counters_only"):
                 continue
             lines.append("- %s (%s): dispensed this shift %s and %s." % (
                 r["name"], r["fuel_type"], r["dispensed_volume_text"] or "n/a (liters not recorded yet)",

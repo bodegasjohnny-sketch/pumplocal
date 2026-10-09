@@ -2,7 +2,7 @@
 
 These are computer-generated test images, not photos of a real pump or receipt.
 Prices are the real JCB pump prices as of Oct 9, 2026 (Premium 85.90, Unleaded 85.40, Diesel 94.50);
-liters x price = amount, rounded half-up (21.164 x 94.50 = 1,999.998 -> 2,000.00).
+liters x price = amount, rounded half-up (21.164 x 94.50 = 1,999.998 -> 2,000.00; 15.000 x 94.50 = 1,417.50).
 The committed PNGs already exist; you only need this script to regenerate them.
 """
 import os
@@ -61,7 +61,9 @@ def receipt(name):
 
 
 if __name__ == "__main__":
-    meter("meter_premium.png", "Premium", (230, 57, 70), "1030.80", "12.000", "85.90")
+    # The old Premium meter (12.000 L, 1,030.80) is kept in archive/ but is no longer a demo sample.
+    meter(os.path.join("archive", "meter_premium.png"), "Premium", (230, 57, 70), "1030.80", "12.000", "85.90")
+    meter("meter_diesel.png", "Diesel", (38, 70, 83), "1417.50", "15.000", "94.50")
     meter("meter_unleaded.png", "Unleaded", (42, 157, 143), "512.40", "6.000", "85.40")
     receipt("receipt_diesel.png")
     print("Wrote synthetic samples to", OUT)

@@ -52,6 +52,8 @@ Plain-English notes on how PumpLocal really works, taken from the code in this r
 
 **Demo Day:** `python3 seed.py --demo-empty`, then follow [DEMO_SCRIPT.md](DEMO_SCRIPT.md). `tests/test_demo_script.py` replays that click order and checks every number in the script.
 
+**Real vs sample on Demo Day:** the pump is **Premium 3**, read from four REAL photos uploaded live with the card's 📷 Opening / Closing photo buttons (opening 2559778 / 32333.73 = the previous day's closing; closing 2595535 / 32749.80 → 416.07 L, ₱35,757, ₱85.94/L vs posted ₱85.90). The Premium sales it is compared with are a seeded logbook batch of **sample sales** (413.5 L, ₱35,519.65, labeled "Sample sales (demo)"), so the 2.57 L / ₱237.35 gap is staged. Say it plainly: "Pump readings: real photos. Sales: sample data. Gap is a demo, not a real station shortage." Parser: "2.Money All" = pesos even though the line says "Volume"; "1.Report Oil … lite" = liters, decimals kept; "3.Type Money / Bank" = pesos. Readings go to the side you pick (📷 Opening photo / 📷 Closing photo); a closing lower than the opening is never swapped silently: "Opening is higher than closing. Swap them?" with a ⇄ Swap button, and no negative sale is ever counted.
+
 ## 2. How the Gemma fallback works
 
 - **When it's used:** only if OCR is unavailable (not a Mac, no Xcode tools), OCR fails or times out, or OCR's numbers don't add up. For totalizers, also when no labelled number was found.
@@ -85,7 +87,7 @@ percent       = difference ÷ expected × 100
 - Sales are added up **by fuel type**: liters, and **gross** pesos, because the pump doesn't know about discounts.
 - **`core.gap_check`**: gap = pump − recorded. Within the tolerance (default **0.5 %** of dispensed) it's OK. Above it, it's **UNACCOUNTED** (red). Below it, **OVER_RECORDED** (a duplicate sale or misread).
 - **`core.price_check`**: implied price = pesos ÷ liters. It must match the posted price within **±₱0.05/L**, or fall inside the old–new range if "price changed this shift" was set. **A miss is a yellow warning only, never a theft flag.**
-- Example from the demo data (real JCB prices as of Oct 9, 2026): the pump shows 105 L / ₱9,922, recorded sales are 101 L / ₱9,544.50, so **4 L (3.81 %) / ₱377.50 (3.80 %) unaccounted**, and the implied price is ₱94.50/L, which passes. Demo Day flow (`--demo-empty`): 0.836 L / ₱79.00 (2.61 %) unaccounted on Diesel 2, cash SHORT ₱50.00.
+- Example from the demo data (real JCB prices as of Oct 9, 2026): the pump shows 105 L / ₱9,922, recorded sales are 101 L / ₱9,544.50, so **4 L (3.81 %) / ₱377.50 (3.80 %) unaccounted**, and the implied price is ₱94.50/L, which passes. Demo Day flow (`--demo-empty`): Premium 3 (real readings vs sample sales) 2.57 L (0.62 %) / ₱237.35 (0.66 %) unaccounted, price OK ₱85.94 vs ₱85.90; cash SHORT ₱50.00 (−0.13 %); totals 14 sales, ₱40,394.55, 465.664 L.
 
 ## 4. Where data lives
 

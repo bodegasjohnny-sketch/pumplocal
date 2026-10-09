@@ -7,7 +7,7 @@ import unittest
 
 from tests.test_flow import FAKE_OCR, FIXTURES, ROOT, FakeOllama, Server, call, free_port, start_fake
 
-REAL = os.path.join(ROOT, "samples", "real_totalizer_diesel2.png")
+REAL = os.path.join(ROOT, "samples", "archive", "real_totalizer_diesel2.png")
 HEADLINE = "Pump says 105 L dispensed; recorded sales 101 L; 4 L (3.81%) unaccounted."
 PESO_HEADLINE = "Pump says ₱9,922.00 dispensed; recorded sales ₱9,544.50; ₱377.50 (3.80%) unaccounted."
 
@@ -47,9 +47,9 @@ class PumpFlowTest(unittest.TestCase):
         code, sh = call(self.b, "/api/shift")
         self.assertEqual((sh["count"], sh["total_amount"]), (15, "15971.75"))  # seed sales unchanged
         code, samples = call(self.b, "/api/samples")
-        self.assertEqual(samples["pump_samples"], ["real_totalizer_diesel2.png", "synthetic_totalizer_diesel2_close_money.png",
-                                                   "synthetic_totalizer_diesel2_close_volume.png"])
-        self.assertEqual(call(self.b, "/samples/real_totalizer_diesel2.png")[1][:4], b"\x89PNG")
+        # Demo Day uses the REAL Premium 3 photos; the Diesel 2 screens live in samples/archive/ (not served)
+        self.assertEqual(samples["pump_samples"], [])
+        self.assertEqual(samples["real_shift_samples"], [])  # Premium 3 photos are uploaded by hand
 
     def test_2_extract_real_photo(self):
         code, ex = call(self.b, "/api/pump/extract", {"image": real_b64()})

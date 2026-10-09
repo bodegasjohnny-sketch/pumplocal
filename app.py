@@ -93,9 +93,11 @@ class Handler(BaseHTTPRequestHandler):
             pump = [f for f in files if "totalizer" in f.lower()]
             slip = [f for f in files if f.lower().startswith("closing_slip")]
             other = [f for f in files if f.lower().startswith(("closing_sheet", "handwritten"))]
+            real_shift = [f for f in files if f.lower().startswith("premium3_")]  # REAL Premium 3 photos
             # "samples" = sale photos (Photo tab); "pump_samples" = totalizer photos (Pump tab);
             # "other_samples" = e.g. the closing-sheet form images (not a single sale)
-            return self.send_json({"samples": [f for f in files if f not in pump + other + slip],
+            return self.send_json({"samples": [f for f in files if f not in pump + other + slip + real_shift],
+                                   "real_shift_samples": real_shift,
                                    "pump_samples": pump, "other_samples": other,
                                    "slip_samples": sorted(slip, key=lambda f: not f.endswith(".jpg"))})
         if path == "/api/status":
@@ -104,6 +106,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(core.shift_summary())
         if path == "/api/pump":
             return self.send_json(pump_payload())
+        if path == "/api/pump/real":
+            return self.send_json({"real": core.real_shift_check()})
         return self.send_json({"error": "not found"}, 404)
 
     def do_POST(self):
@@ -225,7 +229,12 @@ class Handler(BaseHTTPRequestHandler):
                                                           data.get("volume"), data.get("source") or "manual")
                 if errors:
                     return self.send_json({"error": " ".join(errors)}, 400)
-                return self.send_json(dict(pump_payload(), reading=rec, warnings=warnings))
+                return self.send_json(dict(pump_payload(), reading=rec, warnings=warnings, placed=rec.get("placed")))
+            if path == "/api/pump/swap":
+                errors = core.swap_reading(data.get("pump_id"), data.get("counter"))
+                if errors:
+                    return self.send_json({"error": " ".join(errors)}, 400)
+                return self.send_json(dict(pump_payload(), swapped=data.get("counter")))
             if path == "/api/pump/settings":
                 tol = core.dec(data.get("tolerance_pct"))
                 if tol is None or tol < 0 or tol > 100:

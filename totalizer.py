@@ -27,10 +27,12 @@ import core
 import meterparse
 
 LABEL = re.compile(
-    r"\b(V[O0]L(?:UME)?|V[O0]1UME|TOTAL(?:IZER)?|TOT|MONEY|AMOUNT|AMT|LITERS?|LITRES?|LITRO|LTRS?|QTY|QUANTITY|"
-    r"PESOS?|PHP|SALES?)\b", re.I)
-LITER_WORDS = re.compile(r"^(V[O0]L|V[O0]1|LIT|LTR|QTY|QUANT)", re.I)
-PESO_WORDS = re.compile(r"^(MONEY|AMOUNT|AMT|PESO|PHP|SALE)", re.I)
+    r"\b(V[O0]L(?:UME)?|V[O0]1UME|TOTAL(?:IZER)?|TOT|MONEY|AMOUNT|AMT|LITERS?|LITRES?|LITE|LITRO|LTRS?|QTY|QUANTITY|"
+    r"PESOS?|PHP|SALES?|BANK)\b", re.I)
+# "REPORT" is the liter screen title on the Premium 3 pump ("1.Report Oil / Volume 32333.73 lite"; the word
+# "liters" is cut off on that screen). "BANK" is the peso total on its "3.Type Money" screen (Coin 0 / Bank ...).
+LITER_WORDS = re.compile(r"^(V[O0]L|V[O0]1|LIT|LTR|QTY|QUANT|REPORT)", re.I)
+PESO_WORDS = re.compile(r"^(MONEY|AMOUNT|AMT|PESO|PHP|SALE|BANK)", re.I)
 
 FUEL_LABEL = re.compile(
     r"\b(DIESEL|PREMIUM|UNLEADED|SUPER|REGULAR|GASOLINE|KEROSENE|DSL)\b(?:\s*[-#]?\s*(?:N[O0]\.?\s*)?(\d{1,2})\b)?", re.I)
@@ -160,8 +162,9 @@ def parse(lines):
         # One counter on screen: the menu title decides (on Johnny's pump the money counter is shown under
         # "2.Money All" even though its line reads "Volume").
         out[screen] = counters[0][3]
-        out["notes"].append("Screen title says %s, so this is the %s totalizer." % (
-            "Money" if screen == "amount" else "Volume", "peso" if screen == "amount" else "liter"))
+        out["notes"].append("Screen title %s means this is the %s totalizer." % (
+            screen_title(lines) or ("Money" if screen == "amount" else "Volume"),
+            "peso" if screen == "amount" else "liter"))
     else:
         for c in counters:
             kind = {"L": "volume", "PHP": "amount"}.get(_unit_of(c[4]))
@@ -176,15 +179,27 @@ def parse(lines):
     return out
 
 
-MENU_TITLE = re.compile(r"^\W*\d{1,2}\s*[.)]\s*([A-Za-z]+)")
+MENU_TITLE = re.compile(r"^\W*\d{1,2}\s*[.)]\s*([A-Za-z]+(?:\s+[A-Za-z]+)?)")
 
 
-def screen_kind(lines):
-    """Menu title such as '2.Money All' -> 'amount', '1.Volume All' -> 'volume', else None."""
+def screen_title(lines):
+    """'2.Money All' -> '"Money All"' (for notes)."""
     for ln in lines:
         m = MENU_TITLE.match(_text(ln).strip())
         if m:
-            k = {"L": "volume", "PHP": "amount"}.get(_unit_of(m.group(1)))
-            if k:
-                return k
+            return '"%s"' % m.group(1)
+    return None
+
+
+def screen_kind(lines):
+    """Menu title -> which counter the screen shows. Two pump models at the station:
+    Diesel 2:   '2.Money All' -> 'amount', '1.Volume All' -> 'volume'
+    Premium 3:  '2.Money All' -> 'amount', '1.Report Oil' -> 'volume' (liters), '3.Type Money' -> 'amount' (Bank)."""
+    for ln in lines:
+        m = MENU_TITLE.match(_text(ln).strip())
+        if m:
+            for word in m.group(1).split():  # "Type Money": the second word decides
+                k = {"L": "volume", "PHP": "amount"}.get(_unit_of(word))
+                if k:
+                    return k
     return None

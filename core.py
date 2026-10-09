@@ -566,8 +566,9 @@ def dispensed(opening, closing, decimals=0):
         return {"ok": False, "value": None, "error": None, "incomplete": True}
     if c < o:
         return {"ok": False, "value": None, "incomplete": False,
-                "error": "Closing reading (%s) is lower than opening (%s). Check the photo and the decimals setting. "
-                         "If the meter rolled over past its maximum, record it by hand." % (
+                "swap": True, "error_tl": SWAP_PROMPT_TL,
+                "error": SWAP_PROMPT + " Closing reading (%s) is lower than opening (%s). Check the photo and the "
+                         "decimals setting. If the meter rolled over past its maximum, record it by hand." % (
                              clean_reading(closing), clean_reading(opening))}
     return {"ok": True, "value": c - o, "error": None, "incomplete": False}
 
@@ -732,6 +733,8 @@ def save_reading(pump_id, kind, amount=None, volume=None, source="manual", shift
     """Store this shift's OPENING ('open') or CLOSING ('close') totalizers for a pump: the peso (amount) counter,
     the liter (volume) counter, or both. A counter left empty keeps its saved value. Returns (record, errors, warnings)."""
     kind = {"opening": "open", "closing": "close"}.get(kind, kind)
+    if kind == "auto":
+        return _save_reading_auto(pump_id, amount, volume, source, shift_id, created_at)
     if kind not in ("open", "close"):
         return None, ["Choose opening or closing."], []
     try:
@@ -780,9 +783,80 @@ def save_reading(pump_id, kind, amount=None, volume=None, source="manual", shift
     return rec, [], warnings
 
 
+SWAP_PROMPT = "Opening is higher than closing. Swap them? (Could also mean the counter rolled over or was reset.)"
+SWAP_PROMPT_TL = ("Mas mataas ang opening kaysa closing. Pagpalitin? (Puwede ring umikot pabalik sa zero o na-reset "
+                  "ang metro.)")
+
+
+def place_reading(value, opening, closing, decimals=0):
+    """Which box a new photo reading goes in (one counter): 'open' or 'close'.
+      no opening yet          -> opening
+      same as the opening     -> opening (a re-read)
+      anything else           -> closing (it came later)
+    A totalizer only counts up, so a closing LOWER than the opening is never swapped silently and never becomes a
+    negative sale: the pump shows SWAP_PROMPT with a Swap button (swap_reading) until staff decide."""
+    if not opening:
+        return "open"
+    if reading_value(value, decimals) == reading_value(opening, decimals):
+        return "open"
+    return "close"
+
+
+def _save_reading_auto(pump_id, amount, volume, source, shift_id, created_at):
+    """Photo flow (kind 'auto'): put each counter in the opening or closing box (see place_reading)."""
+    try:
+        pump = rows("SELECT * FROM pumps WHERE id=?", (int(pump_id),))
+    except (TypeError, ValueError):
+        pump = []
+    if not pump:
+        return None, ["Choose a pump."], []
+    pump = pump[0]
+    shift_id = shift_id or current_shift()["id"]
+    vals = {n: v for n, v in (("amount", amount), ("volume", volume)) if v not in (None, "")}
+    bad = [n for n, v in vals.items() if clean_reading(v) is None]
+    if bad or not vals:
+        return save_reading(pump["id"], "open", amount, volume, source, shift_id, created_at)  # same error text
+    o = (rows("SELECT * FROM totalizer_readings WHERE shift_id=? AND pump_id=? AND kind='open'",
+              (shift_id, pump["id"])) or [{}])[0]
+    placed, warnings, rec = {}, [], None
+    for name, value in vals.items():
+        kind = place_reading(value, o.get(name), None, pump["%s_decimals" % name])
+        rec, errors, w = save_reading(pump["id"], kind, **{name: value}, source=source, shift_id=shift_id,
+                                      created_at=created_at)
+        if errors:
+            return None, errors, []
+        placed[name] = kind
+        warnings += [x for x in w if x not in warnings]
+    rec = dict(rec)
+    rec["placed"] = placed
+    return rec, [], warnings
+
+
+def swap_reading(pump_id, counter, shift_id=None):
+    """Staff tapped Swap: exchange this counter's opening and closing (values and sources). Returns errors."""
+    if counter not in COUNTERS:
+        return ["Choose the peso or the liter totalizer."]
+    try:
+        pump_id = int(pump_id)
+    except (TypeError, ValueError):
+        return ["Choose a pump."]
+    shift_id = shift_id or current_shift()["id"]
+    get = lambda k: rows("SELECT * FROM totalizer_readings WHERE shift_id=? AND pump_id=? AND kind=?",
+                         (shift_id, pump_id, k))
+    o, c = get("open"), get("close")
+    if not (o and c and o[0][counter] and c[0][counter]):
+        return ["Both an opening and a closing reading are needed to swap."]
+    with _db_lock, connect() as conn:
+        for kind, src in (("open", c[0]), ("close", o[0])):
+            conn.execute("UPDATE totalizer_readings SET %s=?, %s_source=?, synced=0 WHERE shift_id=? AND pump_id=? "
+                         "AND kind=?" % (counter, counter), (src[counter], src[counter + "_source"], shift_id, pump_id, kind))
+        conn.commit()
+    return []
+
+
 def _pump_row(p, o, c):
     row = dict(p)
-    row["error"], row["errors"] = None, []
+    row["error"], row["errors"], row["swap"] = None, [], []
     statuses = []
     for name in COUNTERS:
         unit, decs = COUNTER_UNIT[name], p["%s_decimals" % name]
@@ -801,6 +875,8 @@ def _pump_row(p, o, c):
             d = dispensed(ov, cv, decs)
             if d["error"]:
                 st = "ERROR"
+                if d.get("swap"):
+                    row["swap"].append(name)
                 msg = ("Peso" if name == "amount" else "Liter") + " totalizer: " + d["error"]
                 row["errors"].append(msg)
                 row["error"] = row["error"] or msg
@@ -821,6 +897,31 @@ def _pump_row(p, o, c):
     return row
 
 
+def counters_only_key(pump_id):
+    return "counters_only:%s" % pump_id
+
+
+def _counters_only_price(row):
+    """Pump-side check for a pump whose sales are not logged in PumpLocal: implied price vs the posted price."""
+    if not (row.get("dispensed_amount") and row.get("dispensed_volume")) or Decimal(row["dispensed_volume"]) <= 0:
+        return None
+    posted = dec(get_setting("price:%s" % row["fuel_type"]))
+    pc = price_check(row["dispensed_amount"], row["dispensed_volume"], [posted] if posted else ())
+    if pc and posted:
+        off = (Decimal(row["dispensed_amount"]) / Decimal(row["dispensed_volume"]) - posted) / posted * 100
+        pc["off_pct"] = str(q2(abs(off)))
+        pc["basis"] = "posted price"
+    return pc
+
+
+def real_shift_check(shift_id=None):
+    """READING-ONLY pumps (the REAL Premium 3 photos in seed.py --demo-empty): no sales are logged to them in the
+    demo, so they are left out of the sales-vs-pump comparison and the cash check; PumpLocal shows what was
+    dispensed and the implied price vs the posted price."""
+    pumps = pump_check(shift_id)["counters_only"]
+    return {"pumps": pumps} if pumps else None
+
+
 STATUS_RANK = {"ERROR": 0, "UNACCOUNTED": 1, "OVER_RECORDED": 2, "OK": 3}
 
 
@@ -839,10 +940,15 @@ def pump_check(shift_id=None, tolerance_pct=None):
         t["amount"] += Decimal(s["amount_pesos"])  # gross: the pump's peso counter doesn't know about discounts
         t["count"] += 1
         t["prices"].add(Decimal(s["price_per_liter"]))
-    pumps, groups = [], {}
+    pumps, groups, counters_only = [], {}, []
     for p in list_pumps():
         row = _pump_row(p, readings.get((p["id"], "open")), readings.get((p["id"], "close")))
         pumps.append(row)
+        if get_setting(counters_only_key(p["id"])) == "1":
+            row["counters_only"] = True
+            row["price"] = _counters_only_price(row)
+            counters_only.append(row)
+            continue  # reading-only pump: no sales logged to it, never compared with this shift's sales or cash
         if row["status"] == "NONE":
             continue  # pump not read this shift: leave it out of the comparison
         g = groups.setdefault(p["fuel_type"], {"pumps": [], "rows": []})
@@ -891,7 +997,7 @@ def pump_check(shift_id=None, tolerance_pct=None):
                                             sorted(sold["prices"]), item["price_change"])
         out.append(item)
     return {"shift_id": sid, "tolerance_pct": str(tol), "price_tolerance": str(q2(PRICE_TOLERANCE)), "pumps": pumps,
-            "groups": out, "flagged": [g for g in out if g.get("flag")],
+            "groups": out, "flagged": [g for g in out if g.get("flag")], "counters_only": counters_only,
             "price_warnings": [g for g in out if g.get("price") and g["price"]["ok"] is False]}
 
 

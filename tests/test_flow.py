@@ -18,7 +18,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SAMPLE = os.path.join(ROOT, "samples", "meter_premium.png")
+SAMPLE = os.path.join(ROOT, "samples", "archive", "meter_premium.png")
 FAKE_OCR = os.path.join(ROOT, "tests", "fake_ocr.py")
 FIXTURES = os.path.join(ROOT, "tests", "ocr_fixtures")
 

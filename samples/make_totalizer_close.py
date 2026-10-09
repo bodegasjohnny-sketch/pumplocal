@@ -1,6 +1,6 @@
 """Generate SYNTHETIC closing totalizer screens for Diesel 2 (requires Pillow).
 
-They imitate the layout of the REAL photo (samples/real_totalizer_diesel2.png: menu title, "Volume <number>",
+They imitate the layout of the REAL photo (samples/archive/real_totalizer_diesel2.png: menu title, "Volume <number>",
 Cancel / Ok, a "DIESEL 2" sticker) but are computer-generated, with made-up closing numbers consistent with the
 real opening peso reading 775397 (see DEMO_SCRIPT.md):
 
@@ -34,7 +34,7 @@ def screen(name, title, value):
     d.text((W // 2, 650), "SYNTHETIC SAMPLE - not a real photo", font=ImageFont.truetype(SANS, 22),
            fill=(200, 200, 200), anchor="mm")
     im = im.rotate(-1.5, resample=Image.BICUBIC, fillcolor=(58, 62, 70)).filter(ImageFilter.GaussianBlur(0.6))
-    im.save(os.path.join(HERE, name), optimize=True)
+    im.save(os.path.join(HERE, "archive", name), optimize=True)
 
 
 if __name__ == "__main__":

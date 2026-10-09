@@ -1,0 +1,87 @@
+{
+ "width": 940,
+ "height": 800,
+ "engine": "hand-made from the REAL photo (Tesseract can't read this blue dot-matrix LCD); same line format as Apple Vision",
+ "lines": [
+  {
+   "text": "2.Money All",
+   "confidence": 0.9,
+   "x": 0.24,
+   "y": 0.25,
+   "w": 0.25,
+   "h": 0.04
+  },
+  {
+   "text": "Volume 2595535",
+   "confidence": 0.9,
+   "x": 0.19,
+   "y": 0.33,
+   "w": 0.33,
+   "h": 0.04
+  },
+  {
+   "text": "Amount",
+   "confidence": 1.0,
+   "x": 0.73,
+   "y": 0.33,
+   "w": 0.2,
+   "h": 0.06
+  },
+  {
+   "text": "Cancel",
+   "confidence": 0.9,
+   "x": 0.26,
+   "y": 0.45999999999999996,
+   "w": 0.14,
+   "h": 0.04
+  },
+  {
+   "text": "Ok",
+   "confidence": 0.9,
+   "x": 0.51,
+   "y": 0.45999999999999996,
+   "w": 0.05,
+   "h": 0.04
+  },
+  {
+   "text": "Quantity",
+   "confidence": 1.0,
+   "x": 0.7,
+   "y": 0.6799999999999999,
+   "w": 0.24,
+   "h": 0.06
+  },
+  {
+   "text": "PREMIUM 3",
+   "confidence": 0.95,
+   "x": 0.1,
+   "y": 0.69,
+   "w": 0.55,
+   "h": 0.06
+  },
+  {
+   "text": "1",
+   "confidence": 0.6,
+   "x": 0.26,
+   "y": 0.86,
+   "w": 0.03,
+   "h": 0.06
+  },
+  {
+   "text": "2",
+   "confidence": 0.6,
+   "x": 0.4,
+   "y": 0.86,
+   "w": 0.03,
+   "h": 0.06
+  },
+  {
+   "text": "3",
+   "confidence": 0.6,
+   "x": 0.54,
+   "y": 0.86,
+   "w": 0.03,
+   "h": 0.06
+  }
+ ]
+}

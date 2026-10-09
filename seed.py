@@ -100,28 +100,48 @@ def seed(reset=False):
 
 # ---- Demo Day: an EMPTY shift, so everything on screen comes from the photos read live (see DEMO_SCRIPT.md).
 DEMO_DAY_FLOAT = "1000.00"
-DEMO_DAY_OPENING = {"amount": "775397", "volume": "13508"}  # 775397 = the REAL photo; 13508 is demo data
+DEMO_DAY_OPENING = {"amount": "775397", "volume": "13508"}  # 775397 = the REAL photo; 13508 is a sample value
+
+
+# Demo Day pump: Premium 3. Its four totalizer photos are REAL (samples/premium3_*.png); nothing is pre-filled,
+# Johnny reads them on stage with the pump card's Opening photo / Closing photo buttons.
+# Real readings: opening 2559778 / 32333.73, closing 2595535 / 32749.80 -> 416.07 L and P35,757 dispensed (P85.94/L).
+REAL_PUMP = {"name": "Premium 3", "fuel_type": "Premium", "amount_decimals": 0, "volume_decimals": 0}
+REAL_OPENING = {"amount": "2559778", "volume": "32333.73"}
+REAL_CLOSING = {"amount": "2595535", "volume": "32749.80"}
+
+# The shift's earlier Premium sales, entered from the paper logbook by liters at P85.90. These are SAMPLE sales (demo
+# data, not the real shift's logbook): 413.5 L = P35,519.65, so Premium 3 shows a small demo gap of 2.57 L (0.62%) /
+# P237.35 (0.66%), over the 0.5% tolerance, while the price check passes (P85.94 vs P85.90).
+SAMPLE_SALES_NOTE = "Sample sales (demo) · logbook batch"
+DEMO_LOGBOOK = [(5, "45"), (20, "30.5"), (35, "52"), (50, "40"), (65, "38.5"), (80, "60"), (95, "25"), (110, "47.5"),
+                (125, "35"), (140, "40")]
 
 
 def seed_demo_empty():
-    """Fresh database: one open shift with the opening float, posted prices and the Diesel 2 OPENING totalizers
-    preset. No sales, expenses, credit or cash checks."""
+    """Fresh database: one open shift with the opening float, posted prices, pump Premium 3 (no readings) and the
+    Premium logbook batch (sample sales). No expenses, credit or cash checks."""
     if os.path.exists(core.DB_PATH):
         os.remove(core.DB_PATH)
     core.init_db()
+    start = datetime.now().replace(second=0, microsecond=0) - timedelta(hours=3)
     sid = core.execute("INSERT INTO shifts (opened_at, attendant) VALUES (?, ?)",
-                       (datetime.now().replace(second=0, microsecond=0).strftime("%Y-%m-%d %H:%M:%S"), "Demo Day"))
+                       (start.strftime("%Y-%m-%d %H:%M:%S"), "Demo Day"))
     core.set_setting("opening_float:%s" % sid, DEMO_DAY_FLOAT)
     for fuel, price in DEMO_PRICES.items():
         core.set_setting("price:%s" % fuel, price)
-    pump, errors = core.save_pump(DEMO_PUMP)
+    pump, errors = core.save_pump(REAL_PUMP)
     assert not errors, errors
-    rec, errors, _ = core.save_reading(pump["id"], "open", DEMO_DAY_OPENING["amount"], DEMO_DAY_OPENING["volume"],
-                                       "manual", shift_id=sid)
-    assert not errors, errors
-    print("Demo Day shift #%d ready: no sales yet. Opening float %s; prices %s; Diesel 2 opening: peso %s, liter %s."
-          % (sid, core.peso(DEMO_DAY_FLOAT), ", ".join("%s %s" % (f, core.peso(p)) for f, p in DEMO_PRICES.items()),
-             DEMO_DAY_OPENING["amount"], DEMO_DAY_OPENING["volume"]))
+    for minutes, liters in DEMO_LOGBOOK:
+        rec, errors, _ = core.save_sale({"fuel_type": "Premium", "liters": liters, "price_per_liter": DEMO_PRICES["Premium"],
+                                         "source": "seed", "note": SAMPLE_SALES_NOTE}, shift_id=sid,
+                                        created_at=(start + timedelta(minutes=minutes)).strftime("%Y-%m-%d %H:%M:%S"))
+        assert not errors, errors
+    s = core.shift_summary(sid)
+    print("Demo Day shift #%d ready. Opening float %s; prices %s." % (
+        sid, core.peso(DEMO_DAY_FLOAT), ", ".join("%s %s" % (f, core.peso(p)) for f, p in DEMO_PRICES.items())))
+    print("Premium logbook batch (SAMPLE sales): %d sales, %s, %s L. Pump Premium 3: no readings yet (read the 4 REAL "
+          "photos on the Pump tab)." % (s["count"], core.peso(s["total_amount"]), s["total_liters"]))
     return sid
 
 

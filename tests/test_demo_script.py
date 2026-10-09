@@ -22,22 +22,25 @@ sys.path.insert(0, HERE)
 from test_flow import FAKE_OCR, Server, call  # noqa: E402
 
 PHOTOS = {  # sample -> recorded OCR text
-    "meter_premium.png": "meter_premium.json",
+    "meter_diesel.png": "meter_diesel.json",
     "meter_unleaded.png": "meter_unleaded.json",
     "receipt_diesel.png": "receipt_diesel.json",
-    "real_totalizer_diesel2.png": "real_totalizer_diesel2.json",
-    "synthetic_totalizer_diesel2_close_money.png": "synthetic_totalizer_diesel2_close_money.json",
-    "synthetic_totalizer_diesel2_close_volume.png": "synthetic_totalizer_diesel2_close_volume.json",
+    "real_premium3/premium3_opening_shift_pesos.png": "premium3_opening_shift_pesos.json",
+    "real_premium3/premium3_opening_shift_liters.png": "premium3_opening_shift_liters.json",
+    "real_premium3/premium3_closing_shift_pesos.png": "premium3_closing_shift_pesos.json",
+    "real_premium3/premium3_closing_shift_liters.png": "premium3_closing_shift_liters.json",
     "closing_slip_photo.jpg": "closing_slip_photo.json",
 }
 # Every one of these must appear in DEMO_SCRIPT.md.
 EXPECTED_IN_SCRIPT = [
-    "Premium · 12.000 L × ₱85.90 = ₱1,030.80", "Unleaded · 6.000 L × ₱85.40 = ₱512.40",
-    "Diesel · 21.164 L × ₱94.50 = ₱2,000.00", "775397", "778421", "13540",
-    "Pump says 32 L dispensed; recorded sales 31.164 L; 0.836 L (2.61%) unaccounted",
-    "Pump says ₱3,024.00 dispensed; recorded sales ₱2,945.00; ₱79.00 (2.61%) unaccounted",
-    "₱94.50/L", "₱3,313.20", "₱3,263.20", "-₱50.00", "-1.51%", "₱4,488.20", "49.164", "₱2,945.00", "31.164",
+    "Diesel · 15.000 L × ₱94.50 = ₱1,417.50", "Unleaded · 6.000 L × ₱85.40 = ₱512.40",
+    "Diesel · 21.164 L × ₱94.50 = ₱2,000.00", "2559778", "32333.73", "2595535", "32749.80",
+    "Pump says 416.07 L dispensed; recorded sales 413.5 L; 2.57 L (0.62%) unaccounted",
+    "Pump says ₱35,757.00 dispensed; recorded sales ₱35,519.65; ₱237.35 (0.66%) unaccounted",
+    "₱85.94/L", "₱39,219.55", "₱39,169.55", "-₱50.00", "₱40,394.55", "465.664", "₱4,362.50", "46.164",
+    "Pump readings: real photos. Sales: sample data. Gap is a demo, not a real station shortage.",
 ]
+HEADLINE_L, HEADLINE_P = 7, 8
 
 
 def b64(name):
@@ -80,37 +83,48 @@ class DemoScriptTest(unittest.TestCase):
         return j
 
     def test_demo_day_sequence(self):
-        # 0. empty shift with presets
+        # 0. fresh shift: float, prices, pump Premium 3 (no readings) and the Premium logbook batch (SAMPLE sales)
         code, sh = call(self.b, "/api/shift")
-        self.assertEqual((sh["count"], sh["total_amount"], sh["opening_float_preset"]), (0, "0.00", "1000.00"))
+        self.assertEqual((sh["count"], sh["total_amount"], sh["total_liters"], sh["opening_float_preset"]),
+                         (10, "35519.65", "413.500", "1000.00"))
+        self.assertTrue(all("Sample sales (demo)" in x["note"] for x in sh["sales"]))
         code, pump = call(self.b, "/api/pump")
-        diesel2 = pump["pumps"][0]
-        self.assertEqual(diesel2["name"], "Diesel 2")
+        self.assertEqual([(p["name"], p["fuel_type"]) for p in pump["pumps"]], [("Premium 3", "Premium")])
+        p3 = pump["pumps"][0]
 
-        # 1-3. Photo tab: three sale photos, saved as read. The P20 senior discount is NOT typed here: it is on the
-        # closing slip, which applies it (Johnny's live run). Typing it as well is covered in test_slip.
+        # 1-3. Photo tab: three sale photos, saved as read. The P20 senior discount comes from the closing slip.
         sales = []
-        for photo, extra in (("meter_premium.png", {}), ("meter_unleaded.png", {}), ("receipt_diesel.png", {})):
+        for photo in ("meter_diesel.png", "meter_unleaded.png", "receipt_diesel.png"):
             j = self.read("/api/extract", photo)
             self.assertTrue(j["ok"], j)
             f = j["fields"]
             sales.append("%s · %s L × ₱%s = ₱%s" % (f["fuel_type"], f["liters"], f["price_per_liter"],
                                                    "{:,.2f}".format(float(f["amount_pesos"]))))
-            code, saved = call(self.b, "/api/sales", dict(f, source="photo", **extra))
+            code, saved = call(self.b, "/api/sales", dict(f, source="photo"))
             self.assertEqual(code, 200, saved)
         self.assertEqual(sales, EXPECTED_IN_SCRIPT[:3])
 
-        # 4-6. Pump tab: REAL photo = opening (peso), synthetic closings (peso, then liter)
-        for photo, kind, key, want in (("real_totalizer_diesel2.png", "open", "amount", "775397"),
-                                       ("synthetic_totalizer_diesel2_close_money.png", "close", "amount", "778421"),
-                                       ("synthetic_totalizer_diesel2_close_volume.png", "close", "volume", "13540")):
+        # 4-7. Pump tab: Premium 3 card, Opening photo x2 then Closing photo x2 (REAL photos, explicit side;
+        # the screen title picks pesos or liters)
+        for photo, kind, key, want in (("real_premium3/premium3_opening_shift_pesos.png", "open", "amount", "2559778"),
+                                       ("real_premium3/premium3_opening_shift_liters.png", "open", "volume", "32333.73"),
+                                       ("real_premium3/premium3_closing_shift_pesos.png", "close", "amount", "2595535"),
+                                       ("real_premium3/premium3_closing_shift_liters.png", "close", "volume", "32749.80")):
             j = self.read("/api/pump/extract", photo)
-            self.assertEqual((j[key], j["pump_name"]), (want, "Diesel 2"), j)
-            code, r = call(self.b, "/api/pump/reading", {"pump_id": diesel2["id"], "kind": kind, key: j[key],
+            other = "volume" if key == "amount" else "amount"
+            self.assertEqual((j[key], j[other], j["pump_name"]), (want, None, "Premium 3"), j)
+            code, r = call(self.b, "/api/pump/reading", {"pump_id": p3["id"], "kind": kind, key: j[key],
                                                          "source": "photo"})
-            self.assertEqual(code, 200, r)
+            self.assertEqual((code, r["warnings"]), (200, []), r)
+        g = r["check"]["groups"][0]
+        self.assertEqual((g["fuel_type"], g["status"], g["flag"]), ("Premium", "UNACCOUNTED", True))
+        self.assertIn(EXPECTED_IN_SCRIPT[HEADLINE_L], g["headline"])
+        self.assertIn(EXPECTED_IN_SCRIPT[HEADLINE_P], g["headline"])
+        self.assertTrue(g["price"]["ok"])
+        self.assertIn("implied ₱85.94/L", g["price"]["text"])
+        self.assertIn("vs posted ₱85.90/L", g["price"]["text"])
 
-        # 7-8. Cash tab: closing slip -> review -> confirm
+        # 8-9. Cash tab: closing slip -> review -> confirm
         j = self.read("/api/slip/extract", "closing_slip_photo.jpg")
         self.assertTrue(j["ok"])
         c = j["compare"]
@@ -118,7 +132,7 @@ class DemoScriptTest(unittest.TestCase):
         self.assertEqual([(x["customer"], x["fuel_type"], x["status"]) for x in c["credits"]], [("Mang Ben", "Diesel", "new")])
         self.assertEqual(c["discounts"], {"slip": "20.00", "recorded": "0.00", "match": False, "from_slip": "20.00",
                                          "after": "20.00"})
-        self.assertEqual((c["preview"]["expected"], c["preview"]["diff"]), ("3313.20", "-50.00"))
+        self.assertEqual((c["preview"]["expected"], c["preview"]["diff"]), ("39219.55", "-50.00"))
         code, a = call(self.b, "/api/slip/apply", {"slip": j["slip"]})
         self.assertEqual((code, len(a["saved_expenses"]), len(a["saved_credits"]), a["errors"], a["discount_from_slip"]),
                          (200, 2, 1, [], "20.00"))
@@ -126,44 +140,42 @@ class DemoScriptTest(unittest.TestCase):
                                                      "opening_float": j["slip"]["opening_float"],
                                                      "noncash": j["slip"]["noncash"]})
         r = cash["result"]
+        self.cash = r
         self.assertEqual((r["opening_float"], r["gross_sales"], r["discounts"], r["credit_sales"], r["expenses"],
-                          r["noncash"], r["expected"], r["declared"], r["diff"], r["diff_pct"], r["status"]),
-                         ("1000.00", "4488.20", "20.00", "945.00", "410.00", "800.00", "3313.20", "3263.20",
-                          "-50.00", "-1.51", "SHORT"))
+                          r["noncash"], r["expected"], r["declared"], r["diff"], r["status"]),
+                         ("1000.00", "40394.55", "20.00", "945.00", "410.00", "800.00", "39219.55", "39169.55",
+                          "-50.00", "SHORT"))
+        self.assertEqual(r["diff_pct"], "-0.13")
 
-        # Pump result after everything is saved (the credit sale is diesel too)
+        # Pump result after everything is saved: the credit sale is diesel, so Premium 3 is unchanged
         code, pump = call(self.b, "/api/pump")
-        g = pump["check"]["groups"][0]
-        self.assertEqual(g["status"], "UNACCOUNTED")
-        self.assertIn(EXPECTED_IN_SCRIPT[6], g["headline"])
-        self.assertIn(EXPECTED_IN_SCRIPT[7], g["headline"])
-        self.assertTrue(g["price"]["ok"])
-        self.assertIn("implied ₱94.50/L", g["price"]["text"])
+        self.assertEqual(pump["check"]["groups"][0]["headline"], g["headline"])
 
-        # 9-13. Ask: the five chip questions are answered by code ("Computed by PumpLocal"), exact numbers
+        # 10-14. Ask: the five chip questions are answered by code ("Computed by PumpLocal"), exact numbers
         answers = {}
+        script = open(os.path.join(ROOT, "DEMO_SCRIPT.md")).read()
         for q in ("Magkano ang benta ng diesel ngayon?", "What are total sales this shift?",
-                  "Ilang litro ng Premium ang nabenta?", "May kulang ba sa cash?", "May kulang ba sa diesel?",
-                  "What were total sales today?", "Is any diesel missing?"):
+                  "Ilang litro ng Premium ang nabenta?", "May kulang ba sa cash?", "May kulang ba sa premium?",
+                  "What were total sales today?", "Is any premium missing?"):
             code, ans = call(self.b, "/api/ask", {"question": q})
             answers[q] = ans["answer"]
+            if os.environ.get("SHOW_ANSWERS"):
+                print("\n%s -> %s" % (q, ans["answer"]))
             self.assertEqual((ans["source"], ans["unverified_numbers"]), ("code", []), ans)
-            self.assertIn(ans["answer"], open(os.path.join(ROOT, "DEMO_SCRIPT.md")).read())
-        self.assertEqual(answers["Ilang litro ng Premium ang nabenta?"],
-                         "12.000 L ang nabentang Premium ngayong shift (₱1,030.80, 1 benta).")
-        self.assertIn("ang hindi naitala", answers["May kulang ba sa diesel?"])
-        # 14. the free-form question goes to the local model (template in mock mode)
-        code, ans = call(self.b, "/api/ask", {"question": "Bakit hindi tugma ang diesel?"})
-        self.assertNotEqual(ans["source"], "code")
-        self.assertIn("₱2,945.00", answers["Magkano ang benta ng diesel ngayon?"])
-        self.assertIn("31.164", answers["Magkano ang benta ng diesel ngayon?"])
-        self.assertIn("₱4,488.20", answers["What are total sales this shift?"])
-        self.assertIn("49.164 L", answers["What are total sales this shift?"])
-        self.assertIn("0.836 L", answers["Is any diesel missing?"])
-        self.assertIn("₱79.00", answers["Is any diesel missing?"])
-        self.assertIn("₱3,313.20", answers["May kulang ba sa cash?"])
+            if not os.environ.get("SHOW_ANSWERS"):
+                self.assertIn(ans["answer"], script)
+        self.assertIn("₱4,362.50", answers["Magkano ang benta ng diesel ngayon?"])
+        self.assertIn("46.164", answers["Magkano ang benta ng diesel ngayon?"])
+        self.assertIn("₱40,394.55", answers["What are total sales this shift?"])
+        self.assertIn("465.664 L", answers["What are total sales this shift?"])
+        self.assertIn("413.500 L", answers["Ilang litro ng Premium ang nabenta?"])
+        self.assertIn("2.57 L", answers["May kulang ba sa premium?"])
+        self.assertIn("₱237.35", answers["Is any premium missing?"])
+        self.assertIn("₱39,219.55", answers["May kulang ba sa cash?"])
         self.assertIn("₱50.00", answers["May kulang ba sa cash?"])
-        self.assertIn("kulang", answers["May kulang ba sa cash?"].lower())
+        # 15. the free-form question goes to the local model (template in mock mode)
+        code, ans = call(self.b, "/api/ask", {"question": "Bakit hindi tugma ang premium?"})
+        self.assertNotEqual(ans["source"], "code")
 
     def test_script_lists_the_same_numbers(self):
         with open(os.path.join(ROOT, "DEMO_SCRIPT.md")) as f:

@@ -138,6 +138,7 @@
   .row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .row4 { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
   @media (max-width:520px) { .row4 { grid-template-columns:1fr 1fr; } }
+  .sidebtns { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; } .sidebtns .btn { flex:1 1 45%; }
   .realtag { display:inline-block; background:var(--yellow); color:var(--navy); font-weight:800; font-size:11px; padding:1px 6px; border-radius:6px; }
   pre { white-space:pre-wrap; font-size:12.5px; background:#f4f7fb; padding:8px; border-radius:8px; }
 </style>
@@ -242,13 +243,20 @@
         <button class="btn small ghost" id="pcSave">Save price change</button> <button class="btn small ghost" id="pcClear">Clear</button>
       </details>
     </div>
+    <div class="card" id="realCard" style="display:none">
+      <h2>Premium 3 <span class="realtag">REAL PUMP</span> <span class="tl">· Totoong metro</span></h2>
+      <p class="hint">Upload the pump's totalizer photos with <b>📷 Opening photo</b> and <b>📷 Closing photo</b> on the Premium 3
+        card below (Mac file picker or phone camera). Each photo fills only that side; the screen title decides pesos or liters.</p>
+      <div id="realResult"></div>
+    </div>
     <div class="card">
       <h2>Totalizer photo <span class="tl">· Litrato ng metro</span></h2>
       <p class="hint">Photograph the pump's totalizer screen. Apple Vision OCR reads it on this computer (Gemma only as fallback); you check it, then save.
         One photo may show only one counter; save it, then photograph the other.</p>
       <label class="btn" for="pumpFile">📷 Take / Upload Totalizer Photo</label>
       <input type="file" id="pumpFile" accept="image/*" capture="environment">
-      <p class="hint" style="margin-top:12px">Try the <span class="realtag">REAL PHOTO</span> from our station (peso totalizer, opening), then the two synthetic closing screens:</p>
+      <input type="file" id="pumpSideFile" accept="image/*" capture="environment" style="display:none">
+      <p class="hint" style="margin-top:12px;display:none" id="pumpSamplesHint">Sample totalizer screens:</p>
       <div class="samples" id="pumpSamples"></div>
       <img class="preview" id="pumpPreview" alt="Totalizer photo preview">
       <div id="pumpReadMsg"></div>
@@ -359,7 +367,7 @@
         <button>What are total sales this shift?</button>
         <button>Ilang litro ng Premium ang nabenta?</button>
         <button>May kulang ba sa cash?</button>
-        <button>May kulang ba sa diesel?</button>
+        <button>May kulang ba sa premium?</button>
       </div>
       <form class="askrow" id="askForm">
         <input class="txt" id="question" placeholder="Type a question… / Magtanong…" autocomplete="off">
@@ -465,7 +473,9 @@
             prepImage(bl, $("pumpPreview"), extractPump); });
         });
         $("pumpSamples").appendChild(b);
+      $("pumpSamplesHint").style.display = "block";
       });
+      // Premium 3 REAL photos: each fills the Opening or Closing side of Premium 3 (same as the card's photo buttons).
       (j.slip_samples || []).forEach(function (name) {
         var b = document.createElement("button"); b.title = name + " (synthetic slip)";
         b.innerHTML = '<img alt="' + esc(name) + '" src="/samples/' + encodeURIComponent(name) + '">';
@@ -595,7 +605,8 @@
       $("stats").innerHTML = html;
       $("salesBody").innerHTML = s.sales.length ? s.sales.map(function (x) {
         return "<tr><td>" + esc(x.created_at.slice(11, 16)) + '</td><td><span class="chip ' + fuelClass(x.fuel_type) + '">' + esc(x.fuel_type) +
-          '</span>' + (x.source === "photo" ? " 📷" : "") + (x.payment === "credit" ? ' <span class="chip other" title="Credit (utang)">UTANG ' + esc(x.customer) + "</span>" : "") +
+          '</span>' + (x.source === "photo" ? " 📷" : "") +
+          (x.note && x.note.indexOf("Sample sales (demo)") >= 0 ? ' <span class="chip other" title="' + esc(x.note) + '">Sample sales (demo)</span>' : "") + (x.payment === "credit" ? ' <span class="chip other" title="Credit (utang)">UTANG ' + esc(x.customer) + "</span>" : "") +
           (Number(x.discount_pesos) ? ' <span title="Discount (' + esc(x.discount_reason) + ')">−' + peso(x.discount_pesos) + " " + esc(x.discount_reason) + "</span>" : "") + (x.note ? ' <span title="' + esc(x.note) + '">ⓘ</span>' : "") +
           '</td><td class="r">' + x.liters + '</td><td class="r hs">' + Number(x.price_per_liter).toFixed(2) + '</td><td class="r"><b>' +
           peso(x.amount_pesos) + "</b></td><td>" + (x.synced ? "✓" : "⏳") + '</td><td><button class="x" data-id="' + x.id + '">void</button></td></tr>';
@@ -887,9 +898,31 @@
   function loadPump() {
     return api("/api/pump").then(function (j) { if (j.error) { toast(j.error); return; } renderPump(j); });
   }
+  // Premium 3 (REAL photos): counters-only pump, opening carried, closing read on stage.
+  function core_peso(v) { return "₱" + Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function renderReal(j) {
+    var p = (j.check.pumps || []).filter(function (x) { return x.name === "Premium 3"; })[0];
+    if (!p) { $("realCard").style.display = "none"; return; }
+    $("realCard").style.display = "block";
+    state.realPumpId = p.id;
+    var g = (j.check.groups || []).filter(function (x) { return x.pumps.indexOf(p.name) >= 0; })[0];
+    var cell = function (v) { return v ? "<b>" + esc(v) + "</b>" : '<span class="hint">—</span>'; };
+    var html = "<table><tr><th></th><th>Opening</th><th>Closing</th><th>Dispensed</th></tr>" +
+      "<tr><td>₱ peso</td><td>" + cell(p.opening_amount) + "</td><td>" + cell(p.closing_amount) + "</td><td>" + cell(p.dispensed_amount_text) + "</td></tr>" +
+      "<tr><td>L liter</td><td>" + cell(p.opening_volume) + "</td><td>" + cell(p.closing_volume) + "</td><td>" + cell(p.dispensed_volume_text) + "</td></tr></table>";
+    if (p.errors && p.errors.length) html += '<div class="note err">⚠️ ' + esc(p.errors.join(" ")) + " Use ⇄ Swap on the Premium 3 pump card below.</div>";
+    else if (g && g.status !== "INCOMPLETE") {
+      html += '<div class="note ' + (g.flag ? "err" : "ok") + '" id="realVerdict">' + (g.flag ? "🔴 " : "✅ ") + esc(g.headline) + "</div>";
+      if (g.price) html += '<div class="note ' + (g.price.ok ? "ok" : "warn") + '">' + (g.price.ok ? "✅ " : "⚠️ ") + esc(g.price.text) +
+        (g.price.ok ? " (whole-peso counter rounding)" : "") + "</div>";
+    } else html += '<div class="note info">Upload the opening photos (peso and liter), then the closing photos.</div>';
+    html += '<div class="note warn" id="realHonest"><b>Pump readings: real photos. Sales: sample data. Gap is a demo, not a real station shortage.</b></div>';
+    $("realResult").innerHTML = html;
+  }
   var SRC = { photo: " 📷", seed: " (demo)", carried: " (last shift)" };
   function renderPump(j) {
     state.pump = j;
+    renderReal(j);
     renderPumpGaps(j.check);
     if (document.activeElement !== $("pumpTol")) $("pumpTol").value = j.tolerance_pct;
     var opt = function (v, cur) { return '<option value="' + v + '"' + (String(v) === String(cur) ? " selected" : "") + ">" + v + "</option>"; };
@@ -906,14 +939,23 @@
       var line = p.errors.length ? '<span class="err">⚠️ ' + esc(p.errors.join(" ")) + "</span>" :
         disp.length ? "Dispensed · Nailabas: " + disp.join(" · ") + (p.status === "INCOMPLETE" ? " (other counter incomplete)" : "") :
         p.status === "NONE" ? "No readings this shift." : "Waiting for the other reading.";
+      if (p.counters_only) line += '<div class="hint">Real pump reading. No sales logged for this pump in the demo (not compared with today\'s sales or cash).</div>';
       return '<div class="pumpcard' + (p.errors.length ? " flag" : "") + '">' +
         "<h3>" + esc(p.name) + ' <span class="chip ' + fuelClass(p.fuel_type) + '">' + esc(p.fuel_type) + "</span></h3>" +
         '<div class="row4">' + inp(p, "opening", "amount") + inp(p, "closing", "amount") + inp(p, "opening", "volume") + inp(p, "closing", "volume") + "</div>" +
         '<div class="disp">' + line + "</div>" +
+        (p.swap || []).map(function (c) {
+          return '<div class="note warn">⇅ ' + (c === "amount" ? "Peso" : "Liter") + " totalizer: Opening is higher than closing. Swap them? " +
+            "(Could also mean the counter rolled over or was reset.)<br><span class=\"tl\">Mas mataas ang opening kaysa closing. Pagpalitin? " +
+            "(Puwede ring umikot pabalik sa zero o na-reset ang metro.)</span><br>" +
+            '<button class="btn small" data-swap="' + p.id + '" data-counter="' + c + '">⇄ Swap opening and closing · Pagpalitin</button></div>';
+        }).join("") +
         '<details style="margin-top:6px"><summary>Hidden decimals (default 0)</summary><div class="row2">' +
         '<div><label class="f">Peso counter</label><select class="sel" data-f="amount_decimals">' + [0, 1, 2, 3].map(function (d) { return opt(d, p.amount_decimals); }).join("") + "</select></div>" +
         '<div><label class="f">Liter counter</label><select class="sel" data-f="volume_decimals">' + [0, 1, 2, 3].map(function (d) { return opt(d, p.volume_decimals); }).join("") + "</select></div>" +
         "</div></details>" +
+        '<div class="sidebtns"><button class="btn small" data-side="open" data-pid="' + p.id + '">📷 Opening photo · Litrato ng simula</button>' +
+        '<button class="btn small" data-side="close" data-pid="' + p.id + '">📷 Closing photo · Litrato ng pagsara</button></div>' +
         '<div style="height:8px"></div><button class="btn small green" data-save="' + p.id + '">💾 Save</button></div>';
     }).join("") : '<p class="hint">No pumps yet. Add one below, or read a totalizer photo.</p>';
     fillPumpSelect(state.detected);
@@ -932,15 +974,20 @@
     autoKind();
   }
   function setKind(k) { state.kind = k; document.querySelectorAll("#kindSeg button").forEach(function (b) { b.classList.toggle("on", b.dataset.k === k); }); pumpReadCalc(); }
-  document.querySelectorAll("#kindSeg button").forEach(function (b) { b.addEventListener("click", function () { state.sampleKind = null; setKind(b.dataset.k); }); });
+  document.querySelectorAll("#kindSeg button").forEach(function (b) { b.addEventListener("click", function () { state.sampleKind = null; state.kindManual = true; setKind(b.dataset.k); }); });
   function selectedPump() { var id = $("pumpSel").value; return (state.pump && state.pump.check.pumps.filter(function (p) { return String(p.id) === id; })[0]) || null; }
+  // The lower reading is the opening, the higher one the closing (a totalizer only counts up). The server decides
+  // per counter when the box was not picked by hand (kind "auto"); this only shows where it will go.
   function autoKind() {
     var p = selectedPump(), c = state.detectedCounter || "amount";
-    if (state.sampleKind) { setKind(state.sampleKind); return; }
-    setKind(p && p["opening_" + c] && !p["closing_" + c] ? "close" : (p && p["opening_" + c] ? (state.kind || "close") : "open"));
+    if (state.kindManual) return;
+    var v = Number(String((c === "amount" ? $("pumpAmount") : $("pumpVolume")).value || "").replace(/[^0-9.]/g, ""));
+    var o = p && p["opening_" + c] ? Number(p["opening_" + c]) : null;
+    if (o === null || !v) { setKind(o === null ? "open" : (state.sampleKind || "close")); return; }
+    setKind(v === o ? "open" : "close");  // same number = re-read of the opening; anything else came later
   }
   $("pumpSel").addEventListener("change", autoKind);
-  ["pumpAmount", "pumpVolume"].forEach(function (id) { $(id).addEventListener("input", pumpReadCalc); });
+  ["pumpAmount", "pumpVolume"].forEach(function (id) { $(id).addEventListener("input", function () { if (!state.kindManual) autoKind(); else pumpReadCalc(); }); });
   function pumpReadCalc() {
     var p = selectedPump(), kindWord = state.kind === "close" ? "CLOSING" : "OPENING", parts = [], warn = "";
     [["pumpAmount", "amount", "₱", "peso"], ["pumpVolume", "volume", "L", "liter"]].forEach(function (x) {
@@ -951,12 +998,23 @@
       parts.push(x[3] + " " + esc(v) + (val !== v ? " = " + esc(val) : "") + " " + x[2]);
       var other = p && (state.kind === "close" ? p["opening_" + x[1] + "_value"] : p["closing_" + x[1] + "_value"]);
       if (other && (state.kind === "close" ? Number(val) < Number(other) : Number(val) > Number(other)))
-        warn += '<div class="note err">⚠️ ' + x[3] + " closing would be lower than opening (" + esc(other) + "). Check the photo.</div>";
+        warn += '<div class="note err">⚠️ ' + x[3] + " totalizer: Opening is higher than closing (" + esc(other) + "). Swap them? " +
+          "(Could also mean the counter rolled over or was reset.) Save, then tap ⇄ Swap on the pump below if the photos came in the wrong order. " +
+          "Nothing is counted as dispensed until it is fixed.</div>";
     });
     if (!parts.length && !warn) { $("pumpReadCalc").textContent = "Type or read the peso and/or liter totalizer."; return; }
     $("pumpReadCalc").innerHTML = (parts.length ? "Will save " + (p ? esc(p.name) : "the new pump") + " <b>" + kindWord + "</b>: " + parts.join(" · ") : "") + warn;
   }
-  $("pumpFile").addEventListener("change", function (e) { state.sampleKind = null; if (e.target.files[0]) prepImage(e.target.files[0], $("pumpPreview"), extractPump); e.target.value = ""; });
+  // A pump card's Opening / Closing photo button: the reading fills THAT side of THAT pump only (the screen
+  // title decides pesos or liters). A lower closing than opening still shows the Swap prompt; never negative.
+  function readSide(pid, kind, blob) {
+    state.force = { pump: String(pid), kind: kind }; state.sampleKind = null;
+    if (blob) { prepImage(blob, $("pumpPreview"), extractPump); return; }
+    $("pumpSideFile").click();
+  }
+  $("pumpSideFile").addEventListener("change", function (e) {
+    if (e.target.files[0]) prepImage(e.target.files[0], $("pumpPreview"), extractPump); e.target.value = ""; });
+  $("pumpFile").addEventListener("change", function (e) { state.sampleKind = null; state.force = null; if (e.target.files[0]) prepImage(e.target.files[0], $("pumpPreview"), extractPump); e.target.value = ""; });
   function extractPump(dataUrl, full) {
     busy(true, "Reading totalizer on this computer… · Binabasa ang metro…");
     $("overlaySub").textContent = state.reader === "gemma" || !state.vision
@@ -970,10 +1028,15 @@
       $("overlaySub").textContent = "Running on this computer. The first request can take a minute while the model loads.";
       state.detected = { name: j.pump_name || "", fuel: j.fuel_type || "" };
       state.detectedCounter = j.amount ? "amount" : (j.volume ? "volume" : "amount");
+      state.kindManual = false;
       $("pumpReadForm").style.display = "block";
       $("pumpAmount").value = j.amount || (!j.volume && j.unassigned ? j.unassigned : "") || "";
       $("pumpVolume").value = j.volume || "";
       fillPumpSelect(state.detected);
+      if (state.force) {  // Opening/Closing photo button on a pump card
+        $("pumpSel").value = state.force.pump; state.kindManual = true; setKind(state.force.kind);
+        state.detected = null;
+      }
       state.pumpSource = j.ok ? "photo" : "manual";
       var html = readerLine(j);
       if (j.fallback_reason) html += '<div class="note warn">' + esc(j.fallback_reason) + "</div>";
@@ -994,14 +1057,16 @@
     return true;
   }
   $("pumpReadSave").addEventListener("click", function () {
-    var amount = $("pumpAmount").value, volume = $("pumpVolume").value, id = $("pumpSel").value, kind = state.kind;
+    var amount = $("pumpAmount").value, volume = $("pumpVolume").value, id = $("pumpSel").value, kind = state.kindManual ? state.kind : "auto";
     if (!amount && !volume) { toast("Enter the peso and/or liter totalizer · Ilagay ang numero"); return; }
     var go = function (pid) {
       return api("/api/pump/reading", { pump_id: Number(pid), kind: kind, amount: amount, volume: volume, source: state.pumpSource || "manual" })
         .then(function (j) {
           if (j.error) { toast(j.error, 3500); return; }
           state.detected = null;
-          if (afterPumpSave(j, "Saved ✓ " + (kind === "close" ? "closing" : "opening") + " · Na-save")) {
+          var placedKind = kind !== "auto" ? kind : (j.placed && (j.placed.amount || j.placed.volume)) || state.kind;
+          state.kindManual = false; state.force = null;
+          if (afterPumpSave(j, "Saved ✓ " + (placedKind === "close" ? "closing" : "opening") + " · Na-save")) {
             $("pumpReadForm").style.display = "none"; $("pumpReadMsg").innerHTML = ""; $("pumpPreview").style.display = "none"; }
         });
     };
@@ -1013,6 +1078,14 @@
     else toast("Add a pump first · Magdagdag muna ng pump");
   });
   $("pumpList").addEventListener("click", function (e) {
+    var side = e.target.dataset && e.target.dataset.side;
+    if (side) { readSide(Number(e.target.dataset.pid), side, null); return; }
+    var sw = e.target.dataset && e.target.dataset.swap;
+    if (sw) {
+      api("/api/pump/swap", { pump_id: Number(sw), counter: e.target.dataset.counter }).then(function (j) {
+        afterPumpSave(j, "Swapped ✓ · Napagpalit"); });
+      return;
+    }
     var pid = e.target.dataset && e.target.dataset.save; if (!pid) return;
     var card = e.target.closest(".pumpcard"), p = state.pump.check.pumps.filter(function (x) { return String(x.id) === pid; })[0];
     var ad = Number(card.querySelector('[data-f="amount_decimals"]').value), vd = Number(card.querySelector('[data-f="volume_decimals"]').value);
