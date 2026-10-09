@@ -22,6 +22,14 @@ DEMO_SALES = [
 ]
 
 
+# Extras on the seeded sales (minute of the sale -> fields): one senior discount, one credit (utang) sale.
+DEMO_SALE_EXTRAS = {
+    118: {"discount_pesos": "50", "discount_reason": "senior"},
+    71: {"payment": "credit", "customer": "Mang Ben (trucking)"},
+}
+# Petty cash out of the drawer: (minutes after shift start, pesos, what for).
+DEMO_EXPENSES = [(60, "150", "Ice and drinking water"), (125, "350", "Nozzle O-ring (hardware)")]
+
 # Pump totalizer demo. OPENING 775397 is the reading on the REAL photo samples/real_totalizer_diesel2.png.
 # CLOSING 775578 is DEMO DATA (made up): with 0 decimals in liters the pump says 181 L of diesel left the pump,
 # while the seeded diesel sales add up to 174.216 L (P10,000 at P57.40/L), so 6.784 L (3.75%) is unaccounted.
@@ -64,13 +72,21 @@ def seed(reset=False):
                        (start.strftime("%Y-%m-%d %H:%M:%S"), "Demo Attendant"))
     for minutes, fuel, amount in DEMO_SALES:
         when = (start + timedelta(minutes=minutes)).strftime("%Y-%m-%d %H:%M:%S")
-        rec, errors, _ = core.save_sale({"fuel_type": fuel, "price_per_liter": DEMO_PRICES[fuel],
-                                         "amount_pesos": amount, "source": "seed"}, shift_id=sid, created_at=when)
+        data = dict({"fuel_type": fuel, "price_per_liter": DEMO_PRICES[fuel], "amount_pesos": amount, "source": "seed"},
+                    **DEMO_SALE_EXTRAS.get(minutes, {}))
+        rec, errors, _ = core.save_sale(data, shift_id=sid, created_at=when)
+        assert not errors, errors
+    for minutes, amount, desc in DEMO_EXPENSES:
+        when = (start + timedelta(minutes=minutes)).strftime("%Y-%m-%d %H:%M:%S")
+        rec, errors = core.save_expense({"amount_pesos": amount, "description": desc, "source": "seed"},
+                                        shift_id=sid, created_at=when)
         assert not errors, errors
     seed_pumps(sid, start)
     s = core.shift_summary(sid)
     print("Seeded demo shift #%d: %d sales, %s, %s L" % (sid, s["count"], core.peso(s["total_amount"]),
                                                         s["total_liters"]))
+    print("  Discounts %s, credit (utang) %s, expenses %s" % (
+        core.peso(s["discounts_total"]), core.peso(s["credit_total"]), core.peso(s["expenses_total"])))
     for g in s["pump_check"]["groups"]:
         print("  Pump check (demo): %s" % g["headline"])
     return True

@@ -126,19 +126,58 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/sales/void":
                 core.void_sale(data.get("id"))
                 return self.send_json({"ok": True, "sync": sync.status()})
+            if path == "/api/cash/count":
+                count, errors = core.count_cash(data.get("counts") or data)
+                if errors:
+                    return self.send_json({"error": " ".join(errors)}, 400)
+                return self.send_json(count)
             if path == "/api/cashcheck":
-                if core.dec(data.get("declared")) is None:
-                    return self.send_json({"error": "Enter the declared cash amount."}, 400)
+                count = None
+                if data.get("counts"):
+                    count, errors = core.count_cash(data["counts"])
+                    if errors:
+                        return self.send_json({"error": " ".join(errors)}, 400)
+                declared = data.get("declared")
+                if core.dec(declared) is None and count is not None:
+                    declared = count["total"]  # the denomination count fills in declared cash
+                if core.dec(declared) is None:
+                    return self.send_json({"error": "Enter the declared cash amount (or count the bills)."}, 400)
                 s = core.shift_summary()
-                result = core.compute_cash(s["total_amount"], data.get("declared"), data.get("opening_float"),
-                                           data.get("noncash"))
+                result = core.compute_cash(s["total_amount"], declared, data.get("opening_float"),
+                                           data.get("noncash"), discounts=s["discounts_total"],
+                                           credit=s["credit_total"], expenses=s["expenses_total"])
                 lang = "tl" if data.get("lang") == "tl" else "en"
                 text, source = ai.cash_explanation(result, lang)
-                saved = core.save_cash_check(result, text, source, s["shift"]["id"])
+                saved = core.save_cash_check(result, text, source, s["shift"]["id"],
+                                             json.dumps(count) if count else "")
+                if count is not None:
+                    result["count"] = count
                 pump = s["pump_check"]  # pump meters vs sales, shown in the same summary (code + template)
                 return self.send_json({"result": result, "explanation": text, "explanation_source": source,
                                        "record": saved, "sync": sync.status(), "pump_check": pump,
                                        "pump_text": ai.template_pump_text(pump, lang)})
+            if path == "/api/expenses":
+                rec, errors = core.save_expense(data)
+                if errors:
+                    return self.send_json({"error": " ".join(errors)}, 400)
+                return self.send_json({"expense": rec, "sync": sync.status()})
+            if path == "/api/expenses/void":
+                core.void_expense(data.get("id"))
+                return self.send_json({"ok": True, "sync": sync.status()})
+            if path == "/api/expense/extract":
+                img = data.get("image") or ""
+                if len(img) < 100:
+                    return self.send_json({"error": "No image received."}, 400)
+                try:
+                    return self.send_json(ai.read_expense(img, data.get("image_full") or None))
+                except ai.AIError as e:
+                    return self.send_json({"ok": False, "error": str(e), "amount_pesos": None, "reader": "gemma",
+                                           "message": "Local AI unavailable. Please type the amount."}, 503)
+            if path == "/api/credit":
+                rec, errors, calc = core.save_sale(dict(data, payment="credit"))
+                if errors:
+                    return self.send_json({"error": " ".join(errors), "calc": calc}, 400)
+                return self.send_json({"sale": rec, "calc": calc, "sync": sync.status()})
             if path == "/api/pump/extract":
                 img = data.get("image") or ""
                 if len(img) < 100:

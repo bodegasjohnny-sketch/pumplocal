@@ -132,14 +132,49 @@ def reconcile(liters, price, amount):
     }
 
 
-def compute_cash(sales_total, declared, opening_float=0, noncash=0, tolerance=None):
-    """Expected cash = opening float + sales - non-cash (GCash/card). Pure code, no AI."""
+DENOMS = ("1000", "500", "200", "100", "50", "20")
+
+
+def count_cash(counts):
+    """Cash drawer count: number of 1000/500/200/100/50/20 bills plus coins in pesos -> total. Pure code.
+    Returns (result, errors)."""
+    counts = counts or {}
+    lines, errors, total = [], [], Decimal(0)
+    for d in DENOMS:
+        raw = counts.get(d, counts.get(int(d), ""))
+        raw = "" if raw is None else str(raw).strip()
+        if raw == "":
+            n = 0
+        elif re.fullmatch(r"\d{1,6}", raw):
+            n = int(raw)
+        else:
+            errors.append("Number of ₱%s bills must be a whole number." % d)
+            continue
+        sub = Decimal(d) * n
+        total += sub
+        lines.append({"denom": d, "count": n, "subtotal": str(q2(sub))})
+    coins = counts.get("coins")
+    c = dec(coins) if coins not in (None, "") else Decimal(0)
+    if c is None or c < 0:
+        errors.append("Coins must be a peso amount, e.g. 135.50.")
+        c = Decimal(0)
+    total += c
+    return {"lines": lines, "coins": str(q2(c)), "total": str(q2(total))}, errors
+
+
+def compute_cash(sales_total, declared, opening_float=0, noncash=0, tolerance=None, discounts=0, credit=0,
+                 expenses=0):
+    """Expected cash = opening float + gross sales - discounts - credit (utang) sales - expenses - GCash/card.
+    Pure code, no AI. Credit sales are counted net of their own discount, so nothing is subtracted twice."""
     tol = CASH_TOLERANCE if tolerance is None else Decimal(str(tolerance))
     sales_total = q2(dec(sales_total) or Decimal(0))
     declared = q2(dec(declared) or Decimal(0))
     opening_float = q2(dec(opening_float) or Decimal(0))
     noncash = q2(dec(noncash) or Decimal(0))
-    expected = q2(opening_float + sales_total - noncash)
+    discounts = q2(dec(discounts) or Decimal(0))
+    credit = q2(dec(credit) or Decimal(0))
+    expenses = q2(dec(expenses) or Decimal(0))
+    expected = q2(opening_float + sales_total - discounts - credit - expenses - noncash)
     diff = q2(declared - expected)
     pct = q2(diff / expected * 100) if expected != 0 else None
     if abs(diff) <= tol:
@@ -151,6 +186,8 @@ def compute_cash(sales_total, declared, opening_float=0, noncash=0, tolerance=No
     return {
         "sales_total": str(sales_total), "opening_float": str(opening_float),
         "noncash": str(noncash), "expected": str(expected), "declared": str(declared),
+        "gross_sales": str(sales_total), "discounts": str(discounts), "credit_sales": str(credit),
+        "expenses": str(expenses),
         "diff": str(diff), "diff_pct": str(pct) if pct is not None else None,
         "status": status, "tolerance": str(q2(tol)),
     }
@@ -195,6 +232,16 @@ CREATE TABLE IF NOT EXISTS cash_checks (
   explanation_source TEXT DEFAULT '',
   synced INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS expenses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  shift_id INTEGER NOT NULL REFERENCES shifts(id),
+  created_at TEXT NOT NULL,
+  amount_pesos TEXT NOT NULL,
+  description TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'manual',
+  voided INTEGER NOT NULL DEFAULT 0,
+  synced INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS pumps (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -219,7 +266,15 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 """
 
-SYNC_TABLES = ("shifts", "sales", "cash_checks")
+SYNC_TABLES = ("shifts", "sales", "cash_checks", "expenses")
+# Columns added after v1; init_db adds them to older databases.
+MIGRATIONS = {
+    "sales": [("discount_pesos", "TEXT NOT NULL DEFAULT '0.00'"), ("discount_reason", "TEXT NOT NULL DEFAULT ''"),
+              ("payment", "TEXT NOT NULL DEFAULT 'cash'"), ("customer", "TEXT NOT NULL DEFAULT ''")],
+    "cash_checks": [("discounts", "TEXT NOT NULL DEFAULT '0.00'"), ("credit_sales", "TEXT NOT NULL DEFAULT '0.00'"),
+                    ("expenses", "TEXT NOT NULL DEFAULT '0.00'"), ("cash_count", "TEXT NOT NULL DEFAULT ''")],
+}
+DISCOUNT_REASONS = ("suki", "senior", "pwd", "other")
 
 
 def now():
@@ -241,6 +296,11 @@ def connect():
 def init_db():
     with _db_lock, connect() as conn:
         conn.executescript(SCHEMA)
+        for table, cols in MIGRATIONS.items():
+            have = {r["name"] for r in conn.execute("PRAGMA table_info(%s)" % table)}
+            for name, decl in cols:
+                if name not in have:
+                    conn.execute("ALTER TABLE %s ADD COLUMN %s %s" % (table, name, decl))
 
 
 def rows(sql, args=()):
@@ -281,23 +341,52 @@ def new_shift(attendant=""):
     return rows("SELECT * FROM shifts WHERE id=?", (sid,))[0]
 
 
+def last_price(fuel):
+    r = rows("SELECT price_per_liter FROM sales WHERE fuel_type=? AND voided=0 ORDER BY id DESC LIMIT 1", (fuel,))
+    return r[0]["price_per_liter"] if r else None
+
+
 def save_sale(data, shift_id=None, created_at=None):
+    """A sale. Optional discount (pesos + reason suki/senior/pwd/other) and payment 'credit' (utang, with customer).
+    amount_pesos is the gross pump amount; the discount is what the customer did not pay."""
     fuel = normalize_fuel(data.get("fuel_type"))
-    rec = reconcile(data.get("liters"), data.get("price_per_liter"), data.get("amount_pesos"))
+    payment = "credit" if str(data.get("payment") or "").lower() in ("credit", "utang", "charge") else "cash"
+    customer = re.sub(r"\s+", " ", str(data.get("customer") or "")).strip()[:60]
+    price = data.get("price_per_liter")
+    if payment == "credit" and dec(price) is None and dec(data.get("liters")) is None and fuel:
+        price = last_price(fuel)  # credit form: customer, fuel, amount; price from the last sale of that fuel
+    rec = reconcile(data.get("liters"), price, data.get("amount_pesos"))
     errors = []
     if not fuel:
         errors.append("Fuel type is required.")
     if not (rec["liters"] and rec["price_per_liter"] and rec["amount_pesos"]):
-        errors.append("Enter at least two of liters, price per liter and amount.")
+        errors.append("Enter at least two of liters, price per liter and amount." if payment == "cash" else
+                      "Enter the amount (and the price per liter if this fuel has no sale yet).")
+    if payment == "credit" and not customer:
+        errors.append("Customer name is required for a credit (utang) sale.")
+    disc_raw = data.get("discount_pesos")
+    disc = dec(disc_raw) if disc_raw not in (None, "") else Decimal(0)
+    reason = str(data.get("discount_reason") or "").strip().lower()
+    if disc is None or disc < 0:
+        errors.append("Discount must be a peso amount of zero or more.")
+        disc = Decimal(0)
+    elif disc > 0:
+        if reason not in DISCOUNT_REASONS:
+            errors.append("Choose the discount reason: suki, senior, PWD or other.")
+        if rec["amount_pesos"] and disc > Decimal(rec["amount_pesos"]):
+            errors.append("Discount can't be more than the sale amount.")
+    else:
+        reason = ""
     if errors:
         return None, errors, rec
     shift_id = shift_id or current_shift()["id"]
     note = "; ".join(rec["warnings"] + rec["notes"] + ([data.get("note")] if data.get("note") else []))[:300]
     source = data.get("source") if data.get("source") in ("photo", "manual", "seed") else "manual"
     sid = execute(
-        "INSERT INTO sales (shift_id, created_at, fuel_type, liters, price_per_liter, amount_pesos, source, note) "
-        "VALUES (?,?,?,?,?,?,?,?)",
-        (shift_id, created_at or now(), fuel, rec["liters"], rec["price_per_liter"], rec["amount_pesos"], source, note))
+        "INSERT INTO sales (shift_id, created_at, fuel_type, liters, price_per_liter, amount_pesos, source, note, "
+        "discount_pesos, discount_reason, payment, customer) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        (shift_id, created_at or now(), fuel, rec["liters"], rec["price_per_liter"], rec["amount_pesos"], source, note,
+         str(q2(disc)), reason, payment, customer if payment == "credit" else ""))
     return rows("SELECT * FROM sales WHERE id=?", (sid,))[0], [], rec
 
 
@@ -325,7 +414,26 @@ def shift_summary(shift_id=None):
             fuels.append({"fuel_type": name, "count": f["count"], "liters": str(q3(f["liters"])),
                           "amount": str(q2(f["amount"]))})
     checks = rows("SELECT * FROM cash_checks WHERE shift_id=? ORDER BY id DESC LIMIT 1", (shift["id"],))
+    discounts, credit = Decimal(0), Decimal(0)
+    disc_by_reason, credit_list = {}, []
+    for s in sales:
+        d = Decimal(s.get("discount_pesos") or "0")
+        if d:
+            discounts += d
+            disc_by_reason[s["discount_reason"]] = disc_by_reason.get(s["discount_reason"], Decimal(0)) + d
+        if s.get("payment") == "credit":
+            net = Decimal(s["amount_pesos"]) - d
+            credit += net
+            credit_list.append({"id": s["id"], "customer": s["customer"], "fuel_type": s["fuel_type"],
+                                "liters": s["liters"], "amount": str(q2(net)), "created_at": s["created_at"]})
+    expenses = rows("SELECT * FROM expenses WHERE shift_id=? AND voided=0 ORDER BY id", (shift["id"],))
+    exp_total = sum((Decimal(e["amount_pesos"]) for e in expenses), Decimal(0))
     return {
+        "discounts_total": str(q2(discounts)),
+        "discounts_by_reason": {k: str(q2(v)) for k, v in sorted(disc_by_reason.items())},
+        "discount_count": sum(1 for s in sales if Decimal(s.get("discount_pesos") or "0")),
+        "credit_total": str(q2(credit)), "credit_sales": credit_list,
+        "expenses_total": str(q2(exp_total)), "expenses": expenses,
         "shift": shift, "fuels": fuels, "count": len(sales),
         "total_amount": str(q2(total_amount)), "total_liters": str(q3(total_liters)),
         "sales": list(reversed(sales)), "last_cash_check": checks[0] if checks else None,
@@ -333,12 +441,15 @@ def shift_summary(shift_id=None):
     }
 
 
-def save_cash_check(result, explanation, source, shift_id):
+def save_cash_check(result, explanation, source, shift_id, cash_count=""):
     cid = execute(
         "INSERT INTO cash_checks (shift_id, created_at, sales_total, opening_float, noncash, expected, declared, "
-        "diff, diff_pct, status, explanation, explanation_source) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        "diff, diff_pct, status, explanation, explanation_source, discounts, credit_sales, expenses, cash_count) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (shift_id, now(), result["sales_total"], result["opening_float"], result["noncash"], result["expected"],
-         result["declared"], result["diff"], result["diff_pct"], result["status"], explanation, source))
+         result["declared"], result["diff"], result["diff_pct"], result["status"], explanation, source,
+         result.get("discounts", "0.00"), result.get("credit_sales", "0.00"), result.get("expenses", "0.00"),
+         cash_count or ""))
     return rows("SELECT * FROM cash_checks WHERE id=?", (cid,))[0]
 
 
@@ -599,3 +710,27 @@ def pump_check(shift_id=None, tolerance_pct=None):
         out.append(item)
     return {"shift_id": sid, "tolerance_pct": str(tol), "pumps": pumps, "groups": out,
             "flagged": [g for g in out if g.get("flag")]}
+
+
+# ---------------------------------------------------------------- expenses / petty cash out
+def save_expense(data, shift_id=None, created_at=None):
+    """Petty cash taken out of the drawer. Returns (record, errors)."""
+    amount = dec(data.get("amount_pesos", data.get("amount")))
+    desc = re.sub(r"\s+", " ", str(data.get("description") or "")).strip()[:120]
+    errors = []
+    if amount is None or amount <= 0:
+        errors.append("Enter the expense amount in pesos.")
+    elif amount > Decimal("100000"):
+        errors.append("Expense amount looks too large. Please check.")
+    if not desc:
+        errors.append("Enter what the expense was for.")
+    if errors:
+        return None, errors
+    source = data.get("source") if data.get("source") in ("photo", "manual", "seed") else "manual"
+    eid = execute("INSERT INTO expenses (shift_id, created_at, amount_pesos, description, source) VALUES (?,?,?,?,?)",
+                  (shift_id or current_shift()["id"], created_at or now(), str(q2(amount)), desc, source))
+    return rows("SELECT * FROM expenses WHERE id=?", (eid,))[0], []
+
+
+def void_expense(expense_id):
+    execute("UPDATE expenses SET voided=1, synced=0 WHERE id=?", (int(expense_id),))

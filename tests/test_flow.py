@@ -173,8 +173,8 @@ class MockFlowTest(unittest.TestCase):
         code, st = call(self.b, "/api/status")
         self.assertTrue(st["ai"]["ok"] and st["ai"]["mock"])
         self.assertFalse(st["sync"]["online"])
-        self.assertEqual(st["sync"]["queued"], 16)  # 1 shift + 15 seeded sales
-        self.assertTrue(st["sync"]["label"].startswith("Offline, 16 records queued"))
+        self.assertEqual(st["sync"]["queued"], 18)  # 1 shift + 15 seeded sales + 2 seeded expenses
+        self.assertTrue(st["sync"]["label"].startswith("Offline, 18 records queued"))
         code, sh = call(self.b, "/api/shift")
         self.assertEqual((sh["count"], sh["total_amount"]), (15, "16350.00"))
         self.assertEqual([f["fuel_type"] for f in sh["fuels"]], ["Premium", "Unleaded", "Diesel"])
@@ -192,7 +192,7 @@ class MockFlowTest(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertEqual((saved["sale"]["liters"], saved["sale"]["amount_pesos"], saved["sale"]["synced"]),
                          ("23.080", "1500.00", 0))
-        self.assertEqual(saved["sync"]["queued"], 17)
+        self.assertEqual(saved["sync"]["queued"], 19)
         code, err = call(self.b, "/api/sales", {"fuel_type": "Diesel", "amount_pesos": "100"})
         self.assertEqual(code, 400)
 
@@ -201,15 +201,17 @@ class MockFlowTest(unittest.TestCase):
         self.assertEqual(r["liters"], "15.387")
 
     def test_5_cash_check_math(self):
-        # after test_3: sales total = 16350 + 1500 = 17850
-        code, c = call(self.b, "/api/cashcheck", {"declared": "17000", "opening_float": "1000", "noncash": "500",
+        # after test_3: gross sales = 16350 + 1500 = 17850. Seeded: discount 50, credit (utang) 3000, expenses 500.
+        # expected = 1000 float + 17850 - 50 - 3000 - 500 - 500 GCash/card = 14800
+        code, c = call(self.b, "/api/cashcheck", {"declared": "13450", "opening_float": "1000", "noncash": "500",
                                                   "lang": "tl"})
         r = c["result"]
         self.assertEqual((r["sales_total"], r["expected"], r["diff"], r["diff_pct"], r["status"]),
-                         ("17850.00", "18350.00", "-1350.00", "-7.36", "SHORT"))
+                         ("17850.00", "14800.00", "-1350.00", "-9.12", "SHORT"))
+        self.assertEqual((r["discounts"], r["credit_sales"], r["expenses"]), ("50.00", "3000.00", "500.00"))
         self.assertIn("kulang", c["explanation"])
         self.assertIn("₱1,350.00", c["explanation"])
-        code, c = call(self.b, "/api/cashcheck", {"declared": "17852"})
+        code, c = call(self.b, "/api/cashcheck", {"declared": "14302"})
         self.assertEqual(c["result"]["status"], "OK")
         self.assertEqual(call(self.b, "/api/cashcheck", {"declared": ""})[0], 400)
 
@@ -283,7 +285,7 @@ class RealAIPathTest(unittest.TestCase):
             self.assertEqual(a["source"], "ai")
             self.assertIn("Diesel: 6 sales", FakeOllama.last_chat["messages"][0]["content"])
             self.assertEqual(a["unverified_numbers"], ["99,999.00"])
-            code, c = call(s.base, "/api/cashcheck", {"declared": "16000", "lang": "tl"})
+            code, c = call(s.base, "/api/cashcheck", {"declared": "12450", "lang": "tl"})  # expected 12800
             self.assertEqual((c["explanation_source"], c["result"]["diff"]), ("ai", "-350.00"))
         finally:
             s.stop()
@@ -301,7 +303,7 @@ class RealAIPathTest(unittest.TestCase):
             self.assertEqual(ex["fields"]["liters"], None)
             code, a = call(s.base, "/api/ask", {"question": "Total sales?"})
             self.assertEqual((a["source"], "₱16,350.00" in a["answer"]), ("template-fallback", True))
-            code, c = call(s.base, "/api/cashcheck", {"declared": "16350"})
+            code, c = call(s.base, "/api/cashcheck", {"declared": "12800"})
             self.assertEqual((c["result"]["status"], c["explanation_source"]), ("OK", "template-fallback"))
             code, saved = call(s.base, "/api/sales", {"fuel_type": "Premium", "liters": "5", "price_per_liter": "64.99"})
             self.assertEqual(saved["sale"]["amount_pesos"], "324.95")

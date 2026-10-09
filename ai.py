@@ -28,7 +28,8 @@ EXTRACT_PROMPT = (
 TAGALOG_WORDS = {
     "magkano", "ilan", "ilang", "ang", "ng", "ngayon", "benta", "litro", "mga", "ba", "po", "sa",
     "kabuuan", "lahat", "kulang", "sobra", "pera", "naibenta", "nabenta", "anong", "ano", "kita",
-    "kahapon", "ito", "yung", "naman", "na", "pa", "kami", "natin", "paano", "bakit",
+    "kahapon", "ito", "yung", "naman", "na", "pa", "kami", "natin", "paano", "bakit", "utang", "gastos",
+    "magkanong", "sino", "diskwento",
 }
 
 
@@ -374,7 +375,71 @@ def read_totalizer(image, image_full=None):
     return res
 
 
-# ---------------------------------------------------------------- 1c) pump vs sales wording
+# ---------------------------------------------------------------- 1c) expense receipt photo -> TOTAL amount
+EXPENSE_PROMPT = (
+    "This is a store receipt for a small expense. Reply with JSON only: "
+    '{"total": the TOTAL amount paid in pesos as a number (not cash tendered, not change, not subtotal), '
+    '"store": "store name or null"}. Use null if not clearly visible. Do not guess.'
+)
+MOCK_EXPENSE = 'Receipt:\n```json\n{"total": "₱350.00", "store": "Demo Hardware"}\n```'
+
+
+def _expense_result(amount, store, raw, seconds, reader, source, label=None):
+    ok = amount is not None
+    return {"ok": ok, "amount_pesos": amount, "description": store or "", "label": label,
+            "raw": (raw or "")[:500], "seconds": round(seconds, 1), "reader": reader, "source": source,
+            "message": ("Read the TOTAL from the receipt. Check it and add what it was for, then save." if ok else
+                        "Could not find the TOTAL on the receipt. Please type the amount.")}
+
+
+def extract_expense(image_b64):
+    if image_b64.startswith("data:") and "," in image_b64[:100]:
+        image_b64 = image_b64.split(",", 1)[1]
+    t0 = time.time()
+    raw = MOCK_EXPENSE if core.MOCK_AI else chat(
+        [{"role": "user", "content": EXPENSE_PROMPT, "images": [image_b64]}], json_mode=True, num_predict=60)
+    obj = parse_json_text(raw) or {}
+    total = core.dec(obj.get("total"))
+    amount = str(core.q2(total)) if total is not None and total > 0 else None
+    store = obj.get("store") if obj.get("store") not in (None, "", "null") else ""
+    return _expense_result(amount, str(store)[:60], raw, time.time() - t0, "gemma", model_label())
+
+
+def read_expense(image, image_full=None):
+    """Expense receipt -> TOTAL amount. Apple Vision OCR + code first, Gemma only as fallback."""
+    reader = core.READER
+    fallback_reason, partial = None, None
+    if reader in ("auto", "vision"):
+        t0 = time.time()
+        try:
+            data, suffix = _decode_image(image_full or image)
+            lines = vision.run_image_bytes(data, suffix)
+            r = meterparse.receipt_total(lines)
+            res = _expense_result(r["amount"], r["store"], "\n".join(ln.get("text", "") for ln in lines),
+                                  time.time() - t0, "vision", VISION_SOURCE, r["label"])
+            if r["amount"] or reader == "vision":
+                return res
+            partial = res
+            fallback_reason = "Apple Vision found no TOTAL on the receipt, so Gemma read it instead."
+        except vision.OCRError as e:
+            if reader == "vision":
+                return _expense_result(None, "", "", time.time() - t0, "vision", VISION_SOURCE)
+            if vision.status()["available"]:
+                fallback_reason = "Apple Vision OCR failed (%s), so Gemma read it instead." % e
+        except (ValueError, TypeError) as e:
+            fallback_reason = "Could not decode the image for OCR (%s)." % e
+    try:
+        res = extract_expense(image)
+    except AIError:
+        if partial:
+            return partial
+        raise
+    if fallback_reason:
+        res["fallback_reason"] = fallback_reason
+    return res
+
+
+# ---------------------------------------------------------------- 1d) pump vs sales wording
 def template_pump_text(check, lang="en"):
     """Short wording for the pump check. All numbers come from core.pump_check."""
     groups = [g for g in (check or {}).get("groups", []) if g.get("status") != "INCOMPLETE"]
@@ -468,11 +533,24 @@ def summary_context(s):
     for f in s["fuels"]:
         lines.append("%s: %d sales, %s liters, %s." % (f["fuel_type"], f["count"], f["liters"],
                                                         core.peso(f["amount"])))
-    lines.append("TOTAL: %s liters, %s." % (s["total_liters"], core.peso(s["total_amount"])))
+    lines.append("TOTAL (gross sales): %s liters, %s." % (s["total_liters"], core.peso(s["total_amount"])))
+    if "discounts_total" in s:
+        reasons = ", ".join("%s %s" % (k or "other", core.peso(v)) for k, v in s["discounts_by_reason"].items())
+        lines.append("Discounts: %s on %d sales%s." % (core.peso(s["discounts_total"]), s["discount_count"],
+                                                       (" (" + reasons + ")") if reasons else ""))
+        lines.append("Credit (utang) sales, not in the drawer: %s%s." % (core.peso(s["credit_total"]), "".join(
+            "; %s: %s %s L, %s" % (c["customer"], c["fuel_type"], c["liters"], core.peso(c["amount"]))
+            for c in s["credit_sales"])))
+        lines.append("Expenses (petty cash out): %s%s." % (core.peso(s["expenses_total"]), "".join(
+            "; %s %s" % (e["description"], core.peso(e["amount_pesos"])) for e in s["expenses"])))
     c = s.get("last_cash_check")
     if c:
-        lines.append("Last cash check: expected %s, declared %s, difference %s, status %s." % (
-            core.peso(c["expected"]), core.peso(c["declared"]), core.peso(c["diff"]), c["status"]))
+        lines.append("Last cash check: expected %s (opening float %s + gross sales %s - discounts %s - credit %s - "
+                     "expenses %s - GCash/card %s), declared %s, difference %s, status %s." % (
+                         core.peso(c["expected"]), core.peso(c["opening_float"]), core.peso(c["sales_total"]),
+                         core.peso(c.get("discounts") or 0), core.peso(c.get("credit_sales") or 0),
+                         core.peso(c.get("expenses") or 0), core.peso(c["noncash"]), core.peso(c["declared"]),
+                         core.peso(c["diff"]), c["status"]))
     else:
         lines.append("No cash check yet this shift.")
     p = s.get("pump_check")
@@ -543,6 +621,23 @@ def template_answer(question, s, lang):
     pa = pump_answer(question, s, lang)
     if pa:
         return pa
+    if "credit_total" in s:
+        if any(w in q for w in ("utang", "credit", "charge", "pautang")):
+            names = ", ".join("%s %s" % (c["customer"], core.peso(c["amount"])) for c in s["credit_sales"])
+            if lang == "tl":
+                return "Utang ngayong shift: %s (%d)%s." % (core.peso(s["credit_total"]), len(s["credit_sales"]),
+                                                            (": " + names) if names else "")
+            return "Credit (utang) sales this shift: %s (%d)%s." % (core.peso(s["credit_total"]),
+                                                                     len(s["credit_sales"]), (": " + names) if names else "")
+        if any(w in q for w in ("gastos", "expense", "petty", "ginastos", "nagastos")):
+            items = ", ".join("%s %s" % (e["description"], core.peso(e["amount_pesos"])) for e in s["expenses"])
+            if lang == "tl":
+                return "Gastos ngayong shift: %s%s." % (core.peso(s["expenses_total"]), (": " + items) if items else "")
+            return "Expenses this shift: %s%s." % (core.peso(s["expenses_total"]), (": " + items) if items else "")
+        if any(w in q for w in ("discount", "diskwento", "senior", "pwd", "suki")):
+            if lang == "tl":
+                return "Diskwento ngayong shift: %s sa %d benta." % (core.peso(s["discounts_total"]), s["discount_count"])
+            return "Discounts this shift: %s on %d sales." % (core.peso(s["discounts_total"]), s["discount_count"])
     if any(w in q for w in ("cash", "kulang", "sobra", "pera", "short", "over")):
         c = s.get("last_cash_check")
         if not c:

@@ -218,3 +218,51 @@ def _search(nums, A, L, P):
                 if score > best_score:
                     best, best_score = (a, l, p), score
     return best
+
+
+# ---------------------------------------------------------------- expense receipts: TOTAL amount only
+TOTAL_LABEL = re.compile(r"GRAND\s*TOTAL|TOTAL\s*(?:AMOUNT|DUE|SALES?)?|AMOUNT\s*DUE|AMOUNT\s*PAYABLE|HALAGA|\bDUE\b|"
+                         r"\bAMOUNT\b", re.I)
+NOT_TOTAL = re.compile(r"SUB\s*-?\s*TOTAL|CASH|CHANGE|SUKLI|TENDER|VAT|VATABLE|DISCOUNT|DATE|TIME|TIN\b|\bNO\.|"
+                       r"QTY|ITEMS?\b|INVOICE|TEL|PHONE|SERIAL|CARD|GCASH", re.I)
+
+
+def receipt_total(lines):
+    """Expense receipt -> {"amount": "350.00" or None, "store": first text line, "label": ...}. Plain code.
+
+    The amount is the number next to (same line, right of, or just below) a TOTAL / AMOUNT DUE / GRAND TOTAL
+    label; SUBTOTAL, CASH, CHANGE, VAT and DISCOUNT lines are skipped. GRAND TOTAL beats TOTAL beats AMOUNT.
+    """
+    lines = [ln for ln in (lines or []) if (ln.get("text") or "").strip()]
+    store = ""
+    for ln in lines:
+        t = ln["text"].strip()
+        if re.search(r"[A-Za-z]{3}", t) and not NOT_TOTAL.search(t) and not TOTAL_LABEL.search(t):
+            store = t[:60]
+            break
+    labels = []
+    for ln in lines:
+        t = ln["text"]
+        m = TOTAL_LABEL.search(t)
+        if m and not NOT_TOTAL.search(t):
+            rank = 0 if re.search(r"GRAND", m.group(0), re.I) else (1 if re.search(r"TOTAL|DUE|PAYABLE", m.group(0), re.I)
+                                                                     else 2)
+            labels.append((rank, ln, m.group(0)))
+    best = None  # (rank, cost, value, label)
+    for ln in lines:
+        nums = [n for n in numbers_in(ln["text"]) if n > 0]
+        if not nums or NOT_TOTAL.search(ln["text"]):
+            continue
+        for rank, lab, word in labels:
+            if lab is ln:
+                cost = 0.0
+            else:
+                cost = _link_cost(lab, ln) if all(k in lab and k in ln for k in ("x", "y")) else None
+            if cost is None:
+                continue
+            cand = (rank, cost, max(nums), word)
+            if best is None or cand[:2] < best[:2]:
+                best = cand
+    if best is None or not _in(best[2], AMOUNT_RANGE):
+        return {"amount": None, "store": store, "label": None}
+    return {"amount": str(core.q2(best[2])), "store": store, "label": best[3]}

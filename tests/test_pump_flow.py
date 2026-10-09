@@ -63,7 +63,7 @@ class PumpFlowTest(unittest.TestCase):
         self.assertIn("Wala pang reading", a["answer"])
 
     def test_4_cash_check_includes_pump_gap(self):
-        code, c = call(self.b, "/api/cashcheck", {"declared": "16350", "lang": "en"})
+        code, c = call(self.b, "/api/cashcheck", {"declared": "12800", "lang": "en"})
         self.assertEqual(c["result"]["status"], "OK")
         self.assertEqual(c["pump_check"]["flagged"][0]["headline"], HEADLINE)
         self.assertIn(HEADLINE, c["pump_text"])
