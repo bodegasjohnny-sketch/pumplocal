@@ -141,29 +141,118 @@
   .sidebtns { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; } .sidebtns .btn { flex:1 1 45%; }
   .realtag { display:inline-block; background:var(--yellow); color:var(--navy); font-weight:800; font-size:11px; padding:1px 6px; border-radius:6px; }
   pre { white-space:pre-wrap; font-size:12.5px; background:#f4f7fb; padding:8px; border-radius:8px; }
+
+  /* ---- UI polish (Oct 9 night): self-explanatory for a cold pick-up. Display only. ---- */
+  body { font-size:16px; line-height:1.4; }
+  /* Always-visible badge, pinned to the top of the bottom nav */
+  .localbadge { grid-column:1/-1; display:flex; align-items:center; justify-content:center; gap:7px; background:#0b2545; color:#fff;
+    font-size:13px; font-weight:700; padding:5px 8px; letter-spacing:.2px; }
+  .localbadge .dot { background:#4ade80; box-shadow:0 0 6px #4ade80; }
+  body { padding-bottom:calc(112px + env(safe-area-inset-bottom)); }
+  .pill .pk { opacity:.75; }
+  /* Start here strip */
+  .startstrip { background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:10px 12px 12px; margin-bottom:14px;
+    border-left:6px solid var(--yellow); }
+  .startstrip .ss-title { font-size:13px; font-weight:800; color:var(--navy); text-transform:uppercase; letter-spacing:.6px; margin-bottom:8px; }
+  .startstrip .ss-title span { font-weight:400; text-transform:none; color:var(--muted); letter-spacing:0; }
+  .ss-steps { display:grid; grid-template-columns:1fr auto 1fr auto 1fr; gap:6px; align-items:stretch; }
+  .ss-steps .arr { align-self:center; color:var(--muted); font-weight:800; font-size:18px; }
+  .ss-steps button { display:flex; align-items:center; gap:8px; text-align:left; border:2px solid var(--line); background:#f8fafc;
+    border-radius:12px; padding:8px 10px; min-height:52px; cursor:pointer; color:var(--ink); font:inherit; }
+  .ss-steps button .n { flex:none; width:28px; height:28px; border-radius:50%; background:var(--navy); color:#fff; font-weight:800;
+    display:flex; align-items:center; justify-content:center; font-size:15px; }
+  .ss-steps button b { display:block; font-size:15px; line-height:1.2; }
+  .ss-steps button small { display:block; font-size:12px; color:var(--muted); line-height:1.2; margin-top:2px; }
+  .ss-steps button.on { border-color:var(--red); background:#fff5f5; }
+  .ss-steps button.on .n { background:var(--red); }
+  /* One plain hint per tab: English, Tagalog beneath */
+  .tabhint { background:#e7f0fb; border-radius:12px; padding:10px 14px; margin-bottom:14px; color:#13315c; }
+  .tabhint b { display:block; font-size:16px; line-height:1.35; }
+  .tabhint span { display:block; font-size:14px; color:#3d5a80; margin-top:2px; font-style:italic; }
+  /* Secondary / risky buttons */
+  .btn.outline { background:#fff; color:var(--navy); border:2px solid var(--navy); }
+  .btn.risky { background:#fff; color:var(--muted); border:1px solid var(--line); font-weight:600; font-size:14px; }
+  .btn.risky:hover { color:#8a1c25; border-color:#e5a1a7; }
+  .x { color:var(--muted); text-decoration:none; border:1px solid var(--line); border-radius:8px; padding:0 10px; min-height:36px; background:#fff; }
+  .x:hover { color:#8a1c25; border-color:#e5a1a7; }
+  .btn.primary { font-size:20px; min-height:64px; box-shadow:0 4px 14px rgba(230,57,70,.35); }
+  /* Verdicts */
+  .verdict { font-size:19px; font-weight:800; line-height:1.3; margin-top:6px; }
+  .verdict span { display:block; font-size:15px; font-weight:600; opacity:.92; }
+  .result .big { line-height:1.1; }
+  #realVerdict { font-size:18px; font-weight:800; padding:14px; }
+  #realVerdict.err { background:var(--red); color:#fff; } #realVerdict.ok { background:var(--green); color:#fff; }
+  .calc b.SHORT { color:#c1121f; } .calc b.OK { color:#11594f; } .calc b.OVER { color:#b45309; }
+  /* Empty states (CSS only: shown while the box is empty, gone as soon as the app fills it) */
+  .empty:empty { display:block; border:2px dashed #c3cfdf; border-radius:12px; padding:14px; color:var(--muted); font-size:15px; margin-top:12px; }
+  .empty:empty::before { content:attr(data-empty); white-space:pre-line; }
+  /* Tap targets >= 44px */
+  .btn.small { min-height:44px; }
+  .syncbtn { min-height:36px; }
+  .seg button { min-height:40px; min-width:44px; }
+  .quick button { min-height:44px; }
+  select.sel, input.txt { min-height:44px; }
+  details > summary { min-height:44px; display:flex; align-items:center; font-size:14px; }
+  details > summary::before { content:"▸"; margin-right:6px; } details[open] > summary::before { content:"▾"; }
+  details > summary::-webkit-details-marker { display:none; } details > summary { list-style:none; }
+  .sidebtns .btn.sidebtn { min-height:52px; font-size:16px; }
+  .linkbtn { display:inline-flex; align-items:center; min-height:44px; padding:0 6px; }
+  @media (max-width:520px) {
+    header { position:static; }
+    .brand h1 { font-size:20px; }
+    .status { gap:5px; }
+    .pill { font-size:12px; padding:4px 8px; white-space:normal; }
+    .syncbtn { min-height:44px; padding:0 14px; }
+    .slideslink { display:inline-flex; align-items:center; min-height:44px; padding:0 4px; }
+    .seg button { min-height:44px; }
+    main { padding:10px; }
+    .card { padding:14px; }
+    p.hint { font-size:15px; }
+    .ss-steps { grid-template-columns:1fr 1fr 1fr; }
+    .ss-steps .arr { display:none; }
+    .ss-steps button { flex-direction:column; align-items:flex-start; gap:4px; padding:8px; min-height:76px; }
+    .ss-steps button b { font-size:14px; }
+    .ss-steps button small { font-size:11.5px; }
+    .x { min-height:44px; min-width:52px; }
+    nav button { font-size:13px; min-height:56px; }
+    .localbadge { font-size:12.5px; }
+  }
 </style>
 </head>
 <body>
 <header>
   <div class="brand">
     <svg viewBox="0 0 64 64" aria-hidden="true"><rect x="8" y="6" width="32" height="52" rx="5" fill="#e63946"/><rect x="13" y="12" width="22" height="14" rx="2" fill="#fff"/><text x="24" y="23" font-size="9" text-anchor="middle" font-family="monospace" fill="#0b2545">AI</text><rect x="13" y="32" width="22" height="4" rx="2" fill="#ffb703"/><path d="M40 20h6l7 9v19a4 4 0 0 1-8 0V36h-5" stroke="#ffb703" stroke-width="4" fill="none" stroke-linecap="round"/></svg>
-    <div><h1>Pump<span>Local</span></h1><small id="station">Offline AI for gas stations · Gumagana kahit walang internet</small></div>
+    <div><h1>Pump<span>Local</span></h1><small id="station">JCB Gas Station · Sto. Niño, South Cotabato · Offline AI · Gumagana kahit walang internet</small></div>
   </div>
   <div class="status">
     <span class="pill" id="aiPill" title="Local AI on this computer: Apple Vision OCR (photos) + Gemma via Ollama"><span class="dot" id="aiDot"></span><span id="aiLabel">Local AI…</span></span>
-    <span class="pill" title="Cloud sync (the only part that needs internet)"><span class="dot" id="netDot"></span><span id="netLabel">Checking…</span></span>
+    <span class="pill" title="Cloud sync (the only part that needs internet)"><span class="dot" id="netDot"></span><span class="pk">Cloud sync:</span> <span id="netLabel">Checking…</span></span>
     <button class="syncbtn" id="syncBtn">⟳ Sync</button>
     <a class="slideslink" href="/slides" title="Pitch slides (offline)">Slides</a>
   </div>
 </header>
 
 <main>
+  <!-- START HERE: three steps, each jumps to its tab -->
+  <div class="startstrip" id="startStrip" aria-label="Start here">
+    <div class="ss-title">Start here <span>· Simulan dito</span></div>
+    <div class="ss-steps">
+      <button type="button" data-go="photo" class="on"><span class="n">1</span><span><b>Snap or upload a photo</b><small>Kunan o i-upload ang litrato</small></span></button>
+      <span class="arr" aria-hidden="true">→</span>
+      <button type="button" data-go="cash"><span class="n">2</span><span><b>Check the numbers</b><small>Suriin ang mga numero</small></span></button>
+      <span class="arr" aria-hidden="true">→</span>
+      <button type="button" data-go="ask"><span class="n">3</span><span><b>Ask a question</b><small>Magtanong</small></span></button>
+    </div>
+  </div>
+
   <!-- 1. SHIFT PHOTO -->
   <section class="tab active" id="tab-photo">
+    <div class="tabhint"><b>Upload a photo of the pump meter or receipt, check the numbers, then tap Save Sale.</b><span>Mag-upload ng litrato ng metro o resibo, i-check ang mga numero, tapos pindutin ang I-save.</span></div>
     <div class="card">
       <h2>Shift Photo <span class="tl">· Litrato ng metro o resibo</span></h2>
       <p class="hint">Take or upload a photo of the pump meter or receipt. The local AI reads it, you check it, then save.</p>
-      <label class="btn" for="file">📷 Take / Upload Photo</label>
+      <label class="btn primary" for="file">📷 Take / Upload Photo</label>
       <input type="file" id="file" accept="image/*" capture="environment">
       <p class="hint" style="margin-top:12px">No photo handy? Try a sample (synthetic demo images):</p>
       <div class="samples" id="samples"></div>
@@ -171,7 +260,7 @@
     </div>
     <div class="card">
       <h2>Sale details <span class="tl">· I-check bago i-save</span></h2>
-      <div id="extractMsg"></div>
+      <div id="extractMsg" class="empty" data-empty="No photo read yet. Tap 📷 Take / Upload Photo or a sample above; the numbers fill in here.&#10;Wala pang litrato. Pindutin ang 📷 o isang sample sa itaas."></div>
       <label class="f">Fuel type <span class="tl">· Uri ng gasolina</span></label>
       <div class="fuels" id="fuelBtns">
         <button class="fuel" data-f="Premium">Premium</button>
@@ -200,10 +289,11 @@
 
   <!-- SALES / SHIFT -->
   <section class="tab" id="tab-sales">
+    <div class="tabhint"><b>Every sale saved this shift, with totals per fuel. Wrong sale? Tap void on its row.</b><span>Lahat ng benta ngayong shift at ang total bawat gasolina. Mali ang benta? Pindutin ang void.</span></div>
     <div class="card">
       <div class="flex"><h2>This Shift <span class="tl">· Benta ngayong shift</span></h2>
-        <button class="btn small ghost" id="newShiftBtn">Start new shift</button></div>
-      <p class="hint" id="shiftInfo"></p>
+        <button class="btn small risky" id="newShiftBtn" title="Closes this shift (asks first)">Start new shift</button></div>
+      <p class="hint" id="shiftInfo">Loading this shift… · Kinukuha ang shift…</p>
       <div class="grid" id="stats"></div>
     </div>
     <div class="card">
@@ -217,15 +307,16 @@
 
   <!-- PUMP TOTALIZER (Metro ng Pump) -->
   <section class="tab" id="tab-pump">
+    <div class="tabhint"><b>Upload the opening and closing meter photos on the pump card below; PumpLocal compares them with the sales.</b><span>I-upload ang litrato ng metro sa simula at pagsara ng shift sa pump card sa ibaba; ikukumpara ito sa mga benta.</span></div>
     <div class="card">
       <div class="flex"><h2>Pump <span class="tl">· Metro ng Pump</span></h2>
         <span class="seg langseg"><button data-l="en" class="on">EN</button><button data-l="tl">TL</button></span></div>
-      <p class="hint">Each pump has two running totals: the <b>peso</b> totalizer (Money) and the <b>liter</b> totalizer (Volume).
+      <details><summary>How it works · Paano ito gumagana</summary><p class="hint">Each pump has two running totals: the <b>peso</b> totalizer (Money) and the <b>liter</b> totalizer (Volume).
         Record both at shift start (opening) and shift end (closing). PumpLocal computes pesos and liters dispensed and compares
-        them with the sales recorded this shift. All math is done in code.</p>
+        them with the sales recorded this shift. All math is done in code.</p></details>
       <div id="pumpGaps"></div>
       <div style="height:12px"></div>
-      <button class="btn navy" id="pumpExplainBtn">🤖 Explain · Ipaliwanag (local AI)</button>
+      <button class="btn outline" id="pumpExplainBtn">🤖 Explain · Ipaliwanag (local AI)</button>
       <div id="pumpExplain"></div>
       <div class="flex" style="margin-top:12px;justify-content:flex-start">
         <label for="pumpTol" style="font-weight:600;font-size:14px">Tolerance <span style="font-weight:400;color:#5c677d">· Palugit</span></label>
@@ -250,10 +341,24 @@
       <div id="realResult"></div>
     </div>
     <div class="card">
+      <h2>Pumps <span class="tl">· Mga pump at nozzle</span></h2>
+      <p class="hint">Readings are whole numbers as displayed. Only if a pump hides decimal places, set them per counter (1234567 with 2 = 12,345.67).</p>
+      <div id="pumpList"></div>
+      <details id="addPumpBox"><summary>＋ Add a pump · Magdagdag</summary>
+        <div class="row2" style="margin-top:8px">
+          <div><label class="f" for="newPumpName">Name</label><input class="txt" id="newPumpName" placeholder="Diesel 2" style="font-size:16px;padding:10px"></div>
+          <div><label class="f" for="newPumpFuel">Fuel</label><select class="sel" id="newPumpFuel"><option>Diesel</option><option>Premium</option><option>Unleaded</option></select></div>
+        </div>
+        <div style="height:10px"></div>
+        <button class="btn small navy" id="addPumpBtn">Add pump</button>
+      </details>
+    </div>
+    <div class="card">
       <h2>Totalizer photo <span class="tl">· Litrato ng metro</span></h2>
+      <p class="hint"><b>Or</b> read any totalizer photo here; PumpLocal picks the pump and opening/closing for you.</p>
       <p class="hint">Photograph the pump's totalizer screen. Apple Vision OCR reads it on this computer (Gemma only as fallback); you check it, then save.
         One photo may show only one counter; save it, then photograph the other.</p>
-      <label class="btn" for="pumpFile">📷 Take / Upload Totalizer Photo</label>
+      <label class="btn outline" for="pumpFile">📷 Take / Upload Totalizer Photo</label>
       <input type="file" id="pumpFile" accept="image/*" capture="environment">
       <input type="file" id="pumpSideFile" accept="image/*" capture="environment" style="display:none">
       <p class="hint" style="margin-top:12px;display:none" id="pumpSamplesHint">Sample totalizer screens:</p>
@@ -276,32 +381,20 @@
         <button class="btn green" id="pumpReadSave">💾 Save reading · I-save</button>
       </div>
     </div>
-    <div class="card">
-      <h2>Pumps <span class="tl">· Mga pump at nozzle</span></h2>
-      <p class="hint">Readings are whole numbers as displayed. Only if a pump hides decimal places, set them per counter (1234567 with 2 = 12,345.67).</p>
-      <div id="pumpList"></div>
-      <details id="addPumpBox"><summary>＋ Add a pump · Magdagdag</summary>
-        <div class="row2" style="margin-top:8px">
-          <div><label class="f" for="newPumpName">Name</label><input class="txt" id="newPumpName" placeholder="Diesel 2" style="font-size:16px;padding:10px"></div>
-          <div><label class="f" for="newPumpFuel">Fuel</label><select class="sel" id="newPumpFuel"><option>Diesel</option><option>Premium</option><option>Unleaded</option></select></div>
-        </div>
-        <div style="height:10px"></div>
-        <button class="btn small navy" id="addPumpBtn">Add pump</button>
-      </details>
-    </div>
   </section>
 
   <!-- 2. CASH CHECK -->
   <section class="tab" id="tab-cash">
+    <div class="tabhint"><b>Scan the closing slip (or type the cash counted), then tap Check Cash.</b><span>I-scan ang closing slip (o ilagay ang perang nabilang), tapos pindutin ang Suriin.</span></div>
     <div class="card">
       <div class="flex"><h2>Cash Check <span class="tl">· Bilang ng pera</span></h2>
         <span class="seg langseg" id="langSeg"><button data-l="en" class="on">EN</button><button data-l="tl">TL</button></span></div>
       <p class="hint">At shift end, count the cash drawer. PumpLocal computes the expected cash from saved sales and flags any difference.</p>
       <div class="slipbar">
-        <label class="btn small navy" for="slipFile">📷 Scan closing slip · I-scan ang slip</label>
+        <label class="btn small outline" for="slipFile">📷 Scan closing slip · I-scan ang slip</label>
         <input type="file" id="slipFile" accept="image/*" capture="environment">
         <div class="samples" id="slipSamples"></div>
-        <a href="/closing-slip" target="_blank" style="font-size:13px">🖨 Print a blank slip</a>
+        <a class="linkbtn" href="/closing-slip" target="_blank" style="font-size:13px">🖨 Print a blank slip</a>
       </div>
       <div id="slipReview"></div>
       <details id="countBox"><summary>🧮 Count the bills · Bilangin ang pera</summary>
@@ -326,8 +419,8 @@
           <input class="num" id="noncash" inputmode="decimal" placeholder="0.00"></div>
       </div>
       <div style="height:14px"></div>
-      <button class="btn navy" id="cashBtn">🧮 Check Cash · Suriin</button>
-      <div id="cashResult"></div>
+      <button class="btn primary" id="cashBtn">🧮 Check Cash · Suriin</button>
+      <div id="cashResult" class="empty" data-empty="No result yet. Scan the closing slip or enter the declared cash, then tap 🧮 Check Cash. The verdict shows here in big red (short) or green (balanced).&#10;Wala pang resulta. I-scan ang slip o ilagay ang pera, tapos pindutin ang Suriin."></div>
     </div>
     <div class="card">
       <h2>Expenses <span class="tl">· Gastos (petty cash)</span></h2>
@@ -339,7 +432,7 @@
       </div>
       <div id="expMsg"></div>
       <div class="flex" style="margin-top:10px;justify-content:flex-start">
-        <button class="btn small green" id="expSave">＋ Add expense</button>
+        <button class="btn small outline" id="expSave">＋ Add expense</button>
         <label class="btn small ghost" for="expFile">📷 Receipt</label><input type="file" id="expFile" accept="image/*" capture="environment">
       </div>
     </div>
@@ -353,12 +446,13 @@
         <div><label class="f" for="crAmount">Amount ₱</label><input class="txt" id="crAmount" inputmode="decimal" placeholder="0.00" style="font-size:17px;padding:10px"></div>
       </div>
       <div style="height:10px"></div>
-      <button class="btn small green" id="crSave">＋ Add credit sale</button>
+      <button class="btn small outline" id="crSave">＋ Add credit sale</button>
     </div>
   </section>
 
   <!-- 3. ASK -->
   <section class="tab" id="tab-ask">
+    <div class="tabhint"><b>Tap a question below or type your own, in English or Tagalog.</b><span>Pindutin ang isang tanong o mag-type ng sariling tanong, sa English o Tagalog.</span></div>
     <div class="card">
       <h2>Ask <span class="tl">· Magtanong</span></h2>
       <p class="hint">Ask in Tagalog or English. Answers use only this shift's numbers, computed by PumpLocal.</p>
@@ -371,14 +465,15 @@
       </div>
       <form class="askrow" id="askForm">
         <input class="txt" id="question" placeholder="Type a question… / Magtanong…" autocomplete="off">
-        <button class="btn" type="submit">Ask</button>
+        <button class="btn primary" type="submit">Ask</button>
       </form>
-      <div class="chat" id="chat"></div>
+      <div class="chat empty" id="chat" data-empty="No questions yet. Tap one of the questions above to try it; answers use only this shift's numbers.&#10;Wala pang tanong. Pindutin ang isa sa itaas."></div>
     </div>
   </section>
 </main>
 
 <nav>
+  <div class="localbadge" id="localBadge" title="PumpLocal and its AI run on this laptop; only cloud sync needs internet"><span class="dot"></span>💻 Running on this Mac · no internet needed</div>
   <button data-tab="photo" class="active"><span class="ic">📷</span>Photo</button>
   <button data-tab="sales"><span class="ic">⛽</span>Shift</button>
   <button data-tab="pump"><span class="ic">📟</span>Pump</button>
@@ -430,11 +525,17 @@
   function showTab(name) {
     document.querySelectorAll("nav button").forEach(function (x) { x.classList.toggle("active", x.dataset.tab === name); });
     document.querySelectorAll(".tab").forEach(function (x) { x.classList.toggle("active", x.id === "tab-" + name); });
+    document.querySelectorAll("#startStrip [data-go]").forEach(function (x) { x.classList.toggle("on", x.dataset.go === name); });
     if (name === "sales") loadShift();
     if (name === "pump") loadPump();
     if (name === "cash") loadCashExtras();
     window.scrollTo(0, 0);
   }
+
+  // Start here strip: each step jumps to its tab
+  document.querySelectorAll("#startStrip [data-go]").forEach(function (b) {
+    b.addEventListener("click", function () { showTab(b.dataset.go); });
+  });
 
   // ---------- status / sync
   function renderSync(s) {
@@ -619,7 +720,7 @@
           (Number(x.discount_pesos) ? ' <span title="Discount (' + esc(x.discount_reason) + ')">−' + peso(x.discount_pesos) + " " + esc(x.discount_reason) + "</span>" : "") + (x.note ? ' <span title="' + esc(x.note) + '">ⓘ</span>' : "") +
           '</td><td class="r">' + x.liters + '</td><td class="r hs">' + Number(x.price_per_liter).toFixed(2) + '</td><td class="r"><b>' +
           peso(x.amount_pesos) + "</b></td><td>" + (x.synced ? "✓" : "⏳") + '</td><td><button class="x" data-id="' + x.id + '">void</button></td></tr>';
-      }).join("") : '<tr><td colspan="7" style="color:#5c677d">No sales yet this shift.</td></tr>';
+      }).join("") : '<tr><td colspan="7" style="color:#5c677d">No sales yet this shift. Save one from the 📷 Photo tab. · Wala pang benta.</td></tr>';
     });
   }
   $("salesBody").addEventListener("click", function (e) {
@@ -628,6 +729,8 @@
     api("/api/sales/void", { id: Number(id) }).then(function (j) { renderSync(j.sync); loadShift(); toast("Sale voided"); });
   });
   $("newShiftBtn").addEventListener("click", function () {
+    if (!confirm("Start a new shift? This closes the current shift. Its sales stay saved, but the screens start from zero.\n" +
+      "Magsimula ng bagong shift? Isasara ang kasalukuyang shift.")) return;
     var who = prompt("Close this shift and start a new one.\nAttendant name (optional):", "");
     if (who === null) return;
     api("/api/shift/new", { attendant: who }).then(function (j) { renderSync(j.sync); loadShift(); toast("New shift started"); });
@@ -851,6 +954,10 @@
         var pct = r.diff_pct === null ? "" : " (" + (Number(r.diff_pct) > 0 ? "+" : "") + r.diff_pct + "%)";
         $("cashResult").innerHTML = '<div class="result ' + r.status + '"><div class="big">' + label + "</div>" +
           '<div style="font-size:22px;font-weight:800;margin-top:4px">' + (Number(r.diff) > 0 ? "+" : "") + peso(r.diff) + pct + "</div>" +
+          '<div class="verdict">' + ({ OK: "Cash drawer is balanced.", SHORT: "Cash drawer is short by " + peso(Math.abs(Number(r.diff))) + ".",
+            OVER: "Cash drawer is over by " + peso(Math.abs(Number(r.diff))) + "." }[r.status] || "") +
+          "<span>" + ({ OK: "Tugma ang pera sa kaha.", SHORT: "Kulang ang pera sa kaha ng " + peso(Math.abs(Number(r.diff))) + ".",
+            OVER: "Sobra ang pera sa kaha ng " + peso(Math.abs(Number(r.diff))) + "." }[r.status] || "") + "</span></div>" +
           "<table style='margin-top:10px'>" +
           "<tr><td>+ Opening float</td><td class='r'>" + peso(r.opening_float) + "</td></tr>" +
           "<tr><td>+ Gross sales</td><td class='r'>" + peso(r.gross_sales) + "</td></tr>" +
@@ -892,12 +999,12 @@
       (g.price.ok === false ? "⚠️ " : "") + esc(tl ? g.price.text_tl : g.price.text) +
       (g.price_change ? " (price change " + peso(g.price_change.old) + " → " + peso(g.price_change.new) + ")" : "") + "</div>";
     return '<div class="result ' + esc(g.status) + '"><div style="font-size:13px;font-weight:700;opacity:.9">⛽ ' + esc(g.fuel_type) +
-      " · " + esc(g.pumps.join(", ")) + '</div><div class="big" style="font-size:24px">' + statusLabel(g.status) + "</div>" + body + "</div>";
+      " · " + esc(g.pumps.join(", ")) + '</div><div class="big" style="font-size:30px">' + statusLabel(g.status) + "</div>" + body + "</div>";
   }
   function renderPumpGaps(check) {
     if (!check) return;
     $("pumpGaps").innerHTML = check.groups.length ? check.groups.map(gapCard).join("") :
-      '<div class="note info">No pump readings yet this shift. Add a pump below and record its opening totalizers. · Wala pang reading.</div>';
+      '<div class="note info">No pump readings yet this shift. On the pump card below, tap <b>📷 Opening photo</b> (start of shift), then <b>📷 Closing photo</b> (end). The verdict appears here.<br><i>Wala pang reading. Sa pump card sa ibaba, pindutin ang 📷 Opening photo, tapos 📷 Closing photo.</i></div>';
   }
   function pumpSummaryHtml(check) {
     if (!check || !check.groups || !check.groups.length) return "";
@@ -968,8 +1075,8 @@
         '<div><label class="f">Peso counter</label><select class="sel" data-f="amount_decimals">' + [0, 1, 2, 3].map(function (d) { return opt(d, p.amount_decimals); }).join("") + "</select></div>" +
         '<div><label class="f">Liter counter</label><select class="sel" data-f="volume_decimals">' + [0, 1, 2, 3].map(function (d) { return opt(d, p.volume_decimals); }).join("") + "</select></div>" +
         "</div></details>" +
-        '<div class="sidebtns"><button class="btn small" data-side="open" data-pid="' + p.id + '">📷 Opening photo · Litrato ng simula</button>' +
-        '<button class="btn small" data-side="close" data-pid="' + p.id + '">📷 Closing photo · Litrato ng pagsara</button></div>' +
+        '<div class="sidebtns"><button class="btn small sidebtn" data-side="open" data-pid="' + p.id + '">📷 Opening photo · Litrato ng simula</button>' +
+        '<button class="btn small sidebtn" data-side="close" data-pid="' + p.id + '">📷 Closing photo · Litrato ng pagsara</button></div>' +
         '<div style="height:8px"></div><button class="btn small green" data-save="' + p.id + '">💾 Save</button></div>';
     }).join("") : '<p class="hint">No pumps yet. Add one below, or read a totalizer photo.</p>';
     fillPumpSelect(state.detected);
@@ -1066,6 +1173,7 @@
       state.detectedCounter = j.amount ? "amount" : (j.volume ? "volume" : "amount");
       state.kindManual = false;
       $("pumpReadForm").style.display = "block";
+      setTimeout(function () { $("pumpReadForm").scrollIntoView({ behavior: "smooth", block: "center" }); }, 50);
       $("pumpAmount").value = j.amount || (!j.volume && j.unassigned ? j.unassigned : "") || "";
       $("pumpVolume").value = j.volume || "";
       fillPumpSelect(state.detected);

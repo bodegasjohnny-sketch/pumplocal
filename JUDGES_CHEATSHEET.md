@@ -107,7 +107,7 @@ percent       = difference ÷ expected × 100
   - Every new or changed row gets `synced=0`. That covers shifts, sales, cash checks, expenses, pumps and totalizer readings (`core.SYNC_TABLES`).
   - **`sync.sync_now`** POSTs the queued rows as JSON to `SYNC_URL`. It runs from the Sync button and every 30 s in the background.
   - After a 2xx reply, those rows are marked `synced=1`.
-  - If there's no `SYNC_URL`, or the server can't be reached, rows just wait, and the header shows **"Offline, N records queued"**.
+  - If there's no `SYNC_URL`, or the server can't be reached, rows just wait, and the header's sync pill shows **"Cloud sync: Offline, N records queued"**. The badge above the bottom tabs, **"💻 Running on this Mac · no internet needed"**, is always on: everything except sync works offline.
 - **If Ollama is off:** OCR still reads photos on a Mac, cash and pump notes use templates, and Ask answers from the computed totals.
 
 ---
@@ -200,7 +200,8 @@ I tried to break the live app: bad numbers, double-clicks, wrong photos, a new s
     Refused with a clear message: amounts must be above zero, `1e9` isn't read as 1, and a single sale over 10,000 L or ₱1,000,000 is refused. In the cash check, negative or non-numeric cash, float or GCash is refused. A double-tap on a button is ignored.
 
 12. **"What if they press 'Start new shift' by mistake?"**
-    The old shift is closed and kept; its closing totalizer becomes the new shift's opening. The posted fuel prices carry over (this was a bug I fixed on Oct 9). **Weakness:** there's no "reopen shift" button.
+    It's a small grey button and it asks first ("Start a new shift? This closes the current shift…", then the
+    attendant-name prompt); Cancel on either leaves the shift untouched. If confirmed, the old shift is closed and kept; its closing totalizer becomes the new shift's opening. The posted fuel prices carry over (this was a bug I fixed on Oct 9). **Weakness:** there's no "reopen shift" button.
 
 13. **"What if the app or laptop restarts mid-shift?"**
     Everything is saved to SQLite as soon as it's entered; after a restart the same shift, sales and readings are there (tested by killing and restarting the server).

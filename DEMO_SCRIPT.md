@@ -25,6 +25,21 @@ Unleaded ₱85.40, Diesel ₱94.50); pump **Premium 3** (Premium) with **no read
 sales entered from the paper logbook by liters at ₱85.90: **10 sales, 413.500 L, ₱35,519.65**, each marked
 **Sample sales (demo)** in the Sales list. No expenses, credit or cash checks.
 
+**What a judge sees cold (UI polish, Oct 9 night; no button was renamed):**
+- A **Start here · Simulan dito** strip at the top of every tab: **1. Snap or upload a photo** (→ Photo tab) →
+  **2. Check the numbers** (→ Cash tab) → **3. Ask a question** (→ Ask tab). The current step is outlined in red.
+- Under it, one plain hint per tab in English with the Tagalog beneath (e.g. Pump: "Upload the opening and closing
+  meter photos on the pump card below…").
+- A badge pinned above the bottom tabs on every screen: **💻 Running on this Mac · no internet needed**. The header's
+  sync pill now reads **Cloud sync: Offline, N records queued** (the only part that needs internet).
+- One big primary button per screen: 📷 Take / Upload Photo (Photo), 📷 Opening / Closing photo on the pump card
+  (Pump), 🧮 Check Cash · Suriin (Cash), Ask (Ask). On the Pump tab the **Pumps** card (with the Premium 3 card) now
+  sits above the "Totalizer photo" card, and the check-and-save form scrolls into view after each photo is read.
+- **Start new shift** is a small grey button and now asks "Start a new shift? …" (OK/Cancel) before the attendant-name
+  prompt. **void** asks first, as before.
+- The cash result adds a plain line under the big ❌ SHORT: "Cash drawer is short by ₱50.00. · Kulang ang pera sa kaha
+  ng ₱50.00." Empty areas (Photo read, Cash result, Ask chat, Pump verdict) say what to tap instead of staying blank.
+
 ---
 
 ## A. Full version (judges at the table, ~6 min)
@@ -40,7 +55,7 @@ sales entered from the paper logbook by liters at ₱85.90: **10 sales, 413.500 
 ### Pump tab · Premium 3 (REAL photos)
 
 There are **no sample thumbnails on the Pump tab**: you upload the four real photos yourself, so the judges see a real
-upload. On the **Premium 3** pump card (Pump tab, "Pumps" list) tap **📷 Opening photo · Litrato ng simula** or
+upload. On the **Premium 3** pump card (Pump tab, "Pumps" card, right under the Premium 3 REAL PUMP card) tap **📷 Opening photo · Litrato ng simula** or
 **📷 Closing photo · Litrato ng pagsara**. On the Mac the file picker opens: go to the `pumplocal/samples/real_premium3/`
 folder (tip: drag that folder into the Finder sidebar beforehand) and pick the file below. On a phone the camera opens
 instead (you can photograph the pump itself). The opening photos are the previous day's closing readings, used as this
