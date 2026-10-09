@@ -16,7 +16,8 @@ Built for **AppBuildersPH Hackathon 2026**, theme: **Local AI**.
 
 ## Team
 
-- **Johnny Bodegas**, solo
+- **Johnny Bodegas**, solo. Built for the AppBuildersPH Devin Hackathon 2026 (Oct 9–10, 2026).
+- Full build log, with the problems I hit, the timeline and the AI usage: **[BUILD_LOG.md](BUILD_LOG.md)**
 
 ## What it does
 
@@ -126,13 +127,19 @@ If Ollama isn't running, the app still works. On a Mac, photos are still read by
 - **Catch unrecorded sales, even offline:** the pump's own totalizer is compared with recorded sales on the station's computer, so an owner sees "6.784 L / ₱390 unaccounted" at shift end without any internet connection or cloud service.
 - **No per-call API costs:** fuel retail runs on thin margins, and a local model has no per-request fee.
 
-## Disclosures
+## AI usage & disclosures
+
+- **AI coding assistant:** Grok Bot wrote essentially all of the code, tests and docs from my direction. I (Johnny) supplied the real-world requirements and the real photo, tested every build on my 8 GB MacBook Air, and made all the decisions.
+- **Claude:** used only for Mac cleanup (stopping another local app's background processes and clearing the Playwright cache). It wrote no PumpLocal code.
+- **Devin:** not used so far.
+- **AI inside the app:** both models run on-device (see below). AI only reads photos and writes short explanations. All math is done in code.
+- Details and the timeline: [BUILD_LOG.md](BUILD_LOG.md).
 
 - **Models (both on-device):** Apple Vision framework text recognition (`VNRecognizeTextRequest`, built into macOS) for photo OCR, and Gemma 3 4B (`gemma3:4b`) running locally via Ollama.
 - **Stack:** Python 3 standard library (`http.server`, `sqlite3`, `urllib`, `decimal`, `subprocess`), Swift (a small OCR helper, `ocr/ocr.swift`, using Apple's Vision, ImageIO and Foundation frameworks), SQLite, and vanilla HTML/CSS/JS in a single page. Pillow is used only to generate the synthetic sample images (`samples/make_samples.py`) and isn't needed to run the app.
 - **APIs:** none required. The optional sync endpoint (`SYNC_URL`) is the only network call.
-- **Existing code:** none. Everything was built during the hackathon.
-- **AI dev tools:** Grok Bot.
+- **Existing code:** none. Everything was built during the hackathon. The real totalizer photo was taken before kickoff.
+- **AI dev tools:** Grok Bot (all code). Claude was used for Mac cleanup only. See above.
 - **Sample images:** three are synthetic, computer-generated (not photos of real pumps or receipts). `samples/real_totalizer_diesel2.png` is a **real photo** of a pump totalizer screen at the team's own station, a real asset. Only its peso reading (775397) is real; the other seeded pump readings, discounts, credit sales and expenses are demo data.
 - **Demo prices:** the seeded prices (Premium ₱64.99, Unleaded ₱61.25, Diesel ₱57.40) are demo values, not live pump prices.
 
