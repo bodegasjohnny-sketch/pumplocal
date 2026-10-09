@@ -18,7 +18,7 @@ MODEL = os.environ.get("MODEL", "gemma3:4b")
 MOCK_AI = os.environ.get("MOCK_AI", "0") == "1"
 DB_PATH = os.environ.get("DB_PATH", os.path.join(HERE, "pumplocal.db"))
 STATION = os.environ.get("STATION_NAME", "Demo Station")
-AI_TIMEOUT = float(os.environ.get("AI_TIMEOUT", "240"))
+AI_TIMEOUT = float(os.environ.get("AI_TIMEOUT", "600"))
 # Cash differences within this many pesos are treated as OK (rounding / loose coins).
 CASH_TOLERANCE = Decimal(os.environ.get("CASH_TOLERANCE", "5.00"))
 

@@ -149,12 +149,21 @@ def main():
         httpd = ThreadingHTTPServer((HOST, PORT), Handler)
     except OSError as e:
         sys.exit("Port %d is busy (%s). Try: PORT=8081 python3 app.py" % (PORT, e))
-    url = "http://localhost:%d" % PORT
+    url = "http://127.0.0.1:%d" % PORT
     a = ai.status(force=True)
     print("PumpLocal running at %s" % url)
     print("  Local AI: %s (%s)" % (a["detail"], core.MODEL))
     print("  Cloud sync: %s" % sync.status()["label"])
     print("  Press Ctrl+C to stop.", flush=True)
+    if a.get("ok") and not a.get("mock"):
+        def _warm():
+            try:
+                print("  Warming up the local model (first load can take a few minutes)...", flush=True)
+                ai.chat([{"role": "user", "content": "hi"}], num_predict=1)
+                print("  Local model loaded and ready.", flush=True)
+            except Exception as e:
+                print("  Warm-up failed: %s" % e, flush=True)
+        threading.Thread(target=_warm, daemon=True).start()
     if os.environ.get("NO_BROWSER") != "1":
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
     try:
