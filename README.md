@@ -44,7 +44,7 @@ Built for **AppBuildersPH Hackathon 2026**, theme: **Local AI**.
 
    The AI only writes a 1–2 sentence explanation, which is labeled as AI wording. The pump-vs-sales gap for each fuel is shown in the same summary. Discounts, credit and expenses are part of the Ask data too, for questions like *"Magkano ang utang ngayon?"*. The AI only writes a 1–2 sentence explanation, which is labeled as AI wording. The pump-vs-sales gap for each fuel is shown in the same summary.
 4. **Ask: Magtanong.** Staff type questions like *"Magkano ang benta ng diesel ngayon?"* or *"May kulang ba sa diesel?"* Code computes the shift totals and gives them to the model as its only data. The model answers in the same language. If the answer contains a number that isn't in the computed data, PumpLocal shows a warning.
-5. **Offline sync queue.** Every record is saved locally in SQLite with `synced=0`. A Sync button (plus a background check every 30 s) POSTs unsynced records to `SYNC_URL`. When that fails or `SYNC_URL` isn't set, the header shows **"Offline, N records queued"**. Nothing else depends on the internet.
+5. **Offline sync queue.** Every record (shifts, sales, cash checks, expenses, pumps and totalizer readings) is saved locally in SQLite with `synced=0`. A Sync button (plus a background check every 30 s) POSTs unsynced records to `SYNC_URL`. When that fails or `SYNC_URL` isn't set, the header shows **"Offline, N records queued"**. Nothing else depends on the internet.
 6. **Demo data.** On first run the app seeds a realistic shift: 15 sales across Premium (₱64.99/L), Unleaded and Diesel, a ₱50 senior discount, one ₱3,000 diesel credit sale ("Mang Ben (trucking)"), two expenses (₱150 and ₱350), and a **Diesel 2** pump. The pump's opening **peso** totalizer is **775397**, the number on the real photo. **All other pump readings are demo data**: liters 13508 → 13689 and pesos 775397 → 785787. They are chosen so the pump says 181 L / ₱10,390 while the seeded diesel sales add up to 174.216 L / ₱10,000, which shows a 6.784 L / ₱390 (3.75%) gap right away. The implied price is ₱57.40/L, so the price check passes. [`/samples`](samples/) has three **synthetic** images and one **REAL photo** of a totalizer screen from the team's own station (`real_totalizer_diesel2.png`).
 
 All arithmetic is done in Python with `Decimal`, never by the model. That covers `liters = pesos ÷ price`, totals, expected cash, the difference and percent, and pump dispensed / gap / tolerance.
@@ -131,7 +131,7 @@ If Ollama isn't running, the app still works. On a Mac, photos are still read by
 
 - **AI coding assistant:** Grok Bot wrote essentially all of the code, tests and docs from my direction. I (Johnny) supplied the real-world requirements and the real photo, tested every build on my 8 GB MacBook Air, and made all the decisions.
 - **Claude:** used only for Mac cleanup (stopping another local app's background processes and clearing the Playwright cache). It wrote no PumpLocal code.
-- **Devin:** a task to add pump readings to the sync queue was prepared as a pull request. It's pending, with no Devin code merged yet.
+- **Devin:** tried, but it wrote no code. I installed its GitHub app for this repo only, but the free credits had run out. The pump-readings sync it was meant to build was written by Grok Bot instead.
 - **AI inside the app:** both models run on-device (see below). AI only reads photos and writes short explanations. All math is done in code.
 - Details and the timeline: [BUILD_LOG.md](BUILD_LOG.md).
 
@@ -168,7 +168,7 @@ tests/        Unit + end-to-end tests
 - One open shift at a time and one station per install. There are no user accounts or login.
 - The sync payload is a simple JSON batch with no authentication or receiving server included. `SYNC_URL` should point at an endpoint you control.
 - Language detection for answers is a simple Tagalog keyword heuristic.
-- Pump check: sales are matched to pumps by fuel type (sales don't record which nozzle), so pumps of the same fuel are compared as a group. A pump that rolls over past its maximum must be entered by hand. Pump readings are stored locally but are not yet part of the sync queue (expenses are). Credit sales are recorded with a customer name only. There's no utang ledger or payment tracking yet.
+- Pump check: sales are matched to pumps by fuel type (sales don't record which nozzle), so pumps of the same fuel are compared as a group. A pump that rolls over past its maximum must be entered by hand. Pump readings sync like expenses, but the price-change and tolerance settings stay local. Credit sales are recorded with a customer name only. There's no utang ledger or payment tracking yet.
 
 ## License
 

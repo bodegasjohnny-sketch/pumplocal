@@ -20,7 +20,7 @@ This is a plain account of how I built PumpLocal for the hackathon: what I used,
 - **Me (Johnny):** the idea and the real-world requirements from running the station; the real pump photo; testing every build on my Mac; reporting what broke and how fast it ran; every product decision.
 - **Grok Bot (AI coding assistant):** wrote essentially all of the code, tests and docs, following my direction.
 - **Claude:** used only for Mac cleanup during the hackathon, for two things: stopping the background processes of another local app of mine (Creative Video Studio), and clearing the ~1.6 GB Playwright cache. It wrote **no** PumpLocal code.
-- **Devin:** a Devin task was prepared to add pump readings to the sync queue, delivered as a pull request. **Status: pending.** I'll update this line if it's merged. Until then, Devin has contributed no merged code.
+- **Devin:** I tried it. I installed the Devin GitHub app for the pumplocal repo only and prepared a task to add pump readings to the sync queue. The free credits had already run out, so Devin wrote **no** code. Grok Bot built the pump sync instead.
 
 ## Problems I hit, in order
 
@@ -63,6 +63,7 @@ Times are git commit times converted to PHT (UTC+8), from `git log`. Several com
 | 3:38 PM | Synthetic closing-sheet samples added | `d1e8a6c` | 89 |
 | 3:40–3:42 PM | **Pump totalizer v2:** both lifetime counters (pesos and liters), closing − opening for each, price-per-liter check with an optional mid-shift price change, README | `be4b879` → `58686ea` | 94 |
 | 3:44 PM | **Offline pitch deck** at `/slides` (3 slides + "Go to live demo"), header link | `ed3ccad` | 95 |
+| 4:02 PM | **Pump readings sync:** pumps and totalizer readings join the offline sync queue the same way expenses do (built by Grok Bot after Devin had no credits) | `b46cef4` | 102 |
 
 ## Key design decisions
 
