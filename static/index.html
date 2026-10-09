@@ -236,7 +236,7 @@
 (function () {
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
-  var state = { fuel: "", lang: localStorage.getItem("pl_lang") || "en", source: "manual" };
+  var state = { model: "local model", fuel: "", lang: localStorage.getItem("pl_lang") || "en", source: "manual" };
 
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
     return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -276,6 +276,7 @@
     api("/api/status").then(function (j) {
       if (j.error) { $("aiDot").className = "dot off"; $("aiLabel").textContent = "Server stopped"; return; }
       $("aiDot").className = "dot " + (j.ai.ok ? (j.ai.mock ? "warn" : "on") : "off");
+      state.model = j.ai.model;
       $("aiLabel").textContent = j.ai.ok ? ("Local AI ready · " + (j.ai.mock ? "MOCK" : j.ai.model)) : j.ai.detail;
       $("station").textContent = j.station + " · Offline AI · Gumagana kahit walang internet";
       renderSync(j.sync);
@@ -454,7 +455,7 @@
     var pending = addMsg("a", '<span class="spinner" style="display:inline-block;width:18px;height:18px;border-width:3px;vertical-align:middle"></span> Thinking locally… · Nag-iisip…');
     api("/api/ask", { question: q }).then(function (j) {
       if (j.error) { pending.innerHTML = "⚠️ " + esc(j.error); return; }
-      var src = { ai: "🤖 Local AI (" + "gemma3) · numbers from PumpLocal", template: "Template answer (mock mode)",
+      var src = { ai: "🤖 Local AI (" + state.model + ") · numbers from PumpLocal", template: "Template answer (mock mode)",
         "template-fallback": "Local AI unavailable · answered directly from the totals" }[j.source] || j.source;
       var html = esc(j.answer);
       if (j.unverified_numbers && j.unverified_numbers.length)
