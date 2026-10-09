@@ -154,8 +154,7 @@ Shift data queues on the station's computer and syncs to the owner when internet
 - **Claude (Claude Code):** used for Mac setup and cleanup: it installed Ollama at 1:38 PM on Oct 9 (after the 1:00 PM kickoff), stopped another local app's background processes and cleared the ~1.6 GB Playwright cache. It also pulled Qwen2.5 3B, which PumpLocal doesn't use, and I had one app-idea chat with it during the briefing that I didn't follow up on. It wrote no PumpLocal code. I pulled `gemma3:4b` myself at 2:14 PM. Setup timeline: [BUILD_LOG.md](BUILD_LOG.md#problems-i-hit-in-order).
 - **Devin:** tried, but it wrote no code. I installed its GitHub app for this repo only, but the free credits had run out. The pump-readings sync it was meant to build was written by Grok Bot instead.
 - **AI inside the app:** both models run on-device (see below). AI only reads photos and writes short explanations. All math is done in code.
-- **Demo video voiceover:** The demo video's voiceover was made with ElevenLabs, a cloud AI voice tool, used only for the video.
-- **Demo video assembly:** The video was assembled with Johnny's own video engine, built before the hackathon, used only for the demo video. PumpLocal itself uses neither and runs fully offline.
+- **Demo video only:** script drafted with Grok Bot, then ChatGPT and Claude helped rewrite and shorten it; voiceover by ElevenLabs; assembled with Johnny's own video engine (built before the hackathon); final edit in CapCut. None of these are part of PumpLocal, which runs fully offline.
 - Details and the timeline: [BUILD_LOG.md](BUILD_LOG.md).
 
 - **Models (both on-device):** Apple Vision framework text recognition (`VNRecognizeTextRequest`, built into macOS) for photo OCR, and Gemma 3 4B (`gemma3:4b`) running locally via Ollama.

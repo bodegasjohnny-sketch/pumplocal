@@ -27,6 +27,7 @@ This is a plain account of how I built PumpLocal for the hackathon: what I used,
 - **Grok Bot (AI coding assistant):** wrote essentially all of the code, tests and docs, following my direction.
 - **Claude (Claude Code):** used for Mac setup and cleanup during the hackathon: installing Ollama (1:38 PM), stopping the background processes of another local app of mine (Creative Video Studio), and clearing the ~1.6 GB Playwright cache. It also pulled a Qwen2.5 3B model, which PumpLocal does not use. During the briefing I also chatted with it about app ideas, but I never followed up on that chat. It wrote **no** PumpLocal code.
 - **Devin:** I tried it. I installed the Devin GitHub app for the pumplocal repo only and prepared a task to add pump readings to the sync queue. The free credits had already run out, so Devin wrote **no** code. Grok Bot built the pump sync instead.
+- **Demo video only:** script drafted with Grok Bot, then ChatGPT and Claude helped rewrite and shorten it; voiceover by ElevenLabs; assembled with Johnny's own video engine (built before the hackathon); final edit in CapCut. None of these are part of PumpLocal, which runs fully offline.
 
 ## Problems I hit, in order
 
