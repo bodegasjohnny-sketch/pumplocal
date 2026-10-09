@@ -40,7 +40,7 @@ These happened on my 8 GB MacBook Air after the first version of the app ran (be
 4. Added a status badge that says **"Local AI busy"** instead of "not running" while the model is working.
 5. **The key pivot:** read photos with **Apple Vision OCR** (built into macOS) and turn the text into numbers with plain code. Gemma is now only the fallback for photos and does the chat and the short explanations.
 
-After the pivot, photo reads took a few seconds on my Mac.
+After the pivot, photo reads took a few seconds on my Mac. Later I timed one Apple Vision read at **1.8 s** on the MacBook Air (a single measurement, by hand).
 
 ### Later: the Mac got laggy (about 3:53 PM PHT)
 
@@ -65,6 +65,7 @@ Times are git commit times converted to PHT (UTC+8), from `git log`. Several com
 | 3:44 PM | **Offline pitch deck** at `/slides` (3 slides + "Go to live demo"), header link | `ed3ccad` | 95 |
 | 4:02 PM | **Pump readings sync:** pumps and totalizer readings join the offline sync queue the same way expenses do (built by Grok Bot after Devin had no credits) | `b46cef4` | 102 |
 | 4:30 PM | **Slides:** added "How it runs at the station" (staff phones, Wi-Fi router, used Mac mini, UPS) | `17cfb66` | 102 |
+| 4:41 PM | **Bug fix from my test:** a photo of the full closing sheet produced a fake sale (1.000 L, ₱80.35, ₱79.85). The Photo tab now recognizes a whole report or sheet and asks for one pump display or one receipt, without guessing and without falling back to Gemma | `c9ca7ca` | 110 |
 
 ## Key design decisions
 

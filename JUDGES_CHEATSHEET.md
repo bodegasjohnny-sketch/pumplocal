@@ -27,10 +27,11 @@ Plain-English notes on how PumpLocal really works, taken from the code in this r
    - **`_link_cost`** links each number to the nearest label: same row to the right, or directly below. The best-linked number wins for each field.
    - **Cross-check:** liters × price must equal the amount within **1 %** (**`_consistent`**), with sane ranges (price ₱30–150, liters 0.1–500). If the labelled numbers don't agree, **`_search`** tries every combination of the numbers on the page for one that adds up.
    - If only two of the three values are found, **`core.reconcile`** computes the third (for example liters = amount ÷ price, in `Decimal`).
-8. **`ai._vision_result`** builds the reply: the fields, notes, warnings, which reader was used, and how many seconds it took.
+8. **Report guard: `meterparse.report_reason`.** It actually runs right after OCR, before `meterparse.parse`. If the OCR text looks like a whole report or sheet (words like REPORT, PETTY CASH, SALES SUMMARY or RECONCILIATION, more than 30 numbers, or more than 40 lines), `ai.read_photo` stops. It returns empty fields and "This looks like a full report or sheet, not a pump screen or receipt. Snap one pump display or one receipt." in English and Tagalog. It does **not** fall back to Gemma. This was added after a photo of the full closing sheet produced a fake "sale" (1.000 L, ₱80.35, ₱79.85, numbers taken from two different pump prices).
+9. **`ai._vision_result`** builds the reply: the fields, notes, warnings, which reader was used, and how many seconds it took.
    - If the numbers are **consistent**, that's the answer.
    - If not, and `READER=auto`, it goes to the Gemma fallback (section 2).
-9. **Back in the browser**, the values fill an **editable form**. Staff check them and press save. `/api/sales` then runs **`core.save_sale`**, which validates everything again and stores the sale.
+10. **Back in the browser**, the values fill an **editable form**. Staff check them and press save. `/api/sales` then runs **`core.save_sale`**, which validates everything again and stores the sale.
 
 **Pump totalizer photos** use the same path: `/api/pump/extract` → **`ai.read_totalizer`** → `vision.run_image_bytes` → **`totalizer.parse`** (`totalizer.py`).
 - The screen title decides which counter it is: "2.Money All" means the peso counter, "Volume All" means liters. Menu numbers, dates and the "2" in "DIESEL 2" are ignored.
@@ -102,10 +103,10 @@ percent       = difference ÷ expected × 100
    No. All the math is in `core.py` using Python's `Decimal`. AI only reads photos and words short explanations, and Ask answers are checked for numbers that aren't in the computed data.
 
 2. **"Why not just use Gemma for the photos?"**
-   We did at first. On my 8 GB MacBook Air the first photo took over 4 minutes and timed out. Apple Vision OCR is built into macOS, runs on-device, and reads a photo in a few seconds. Code then checks the numbers. Gemma is kept as the fallback.
+   We did at first. On my 8 GB MacBook Air the first photo took over 4 minutes and timed out. Apple Vision OCR is built into macOS, runs on-device, and read a photo in **1.8 s** when I timed it on my MacBook Air (one measurement, by hand). Code then checks the numbers. Gemma is kept as the fallback.
 
 3. **"How accurate is the photo reading?"**
-   Honest answer: **not benchmarked.** It's tested on three synthetic images and the text of one real totalizer photo. Every value is shown in an editable form, and staff must confirm before saving. The 1 % liters × price check catches many misreads.
+   Honest answer: **not benchmarked.** It's tested on three synthetic images, the text of one real totalizer photo, and a full closing sheet, which must be *refused* rather than read. Every value is shown in an editable form, and staff must confirm before saving. The 1 % liters × price check catches many misreads.
 
 4. **"Is it really local / offline?"**
    Yes. Vision OCR is part of macOS, Gemma runs in Ollama on the laptop, and data is in a SQLite file. The only network call is the optional sync to `SYNC_URL`. I can demo it with Wi-Fi off.
@@ -122,7 +123,7 @@ percent       = difference ÷ expected × 100
    - OCR expects labelled meters and receipts; unusual layouts fall back to slow Gemma.
    - Vision OCR is macOS-only.
    - Tagalog detection is a simple keyword list.
-   - Accuracy and speed aren't benchmarked.
+   - Accuracy isn't benchmarked, and speed was timed only once (1.8 s for one Apple Vision read).
 
 8. **"Is the data secure?"**
    It stays on the station's computer. Sync has **no authentication yet**, and there's **no receiving server** in this repo; `SYNC_URL` must point to an endpoint you control. There are no user logins, and the SQLite file isn't encrypted. All of these are on the to-do list.
@@ -131,7 +132,7 @@ percent       = difference ÷ expected × 100
    Grok Bot, an AI coding assistant, wrote essentially all of it from my direction. I supplied the station's real problems and photos, tested on my Mac, and made the decisions. Devin was tried but had no credits left, so it wrote nothing. Claude only helped clean up my Mac. All of this is in `BUILD_LOG.md`.
 
 10. **"How do you know it works?"**
-    There are 102 automated tests (`MOCK_AI=1 python3 -m unittest discover -s tests`). They start the real server, call every endpoint, and test the parsers, the math, sync (with a fake server), a fake Ollama, and Ollama being down. **Caveat:** the tests run on Linux, so Apple Vision itself is replaced by a stand-in that returns recorded OCR text. The real Vision path has only been tried by hand on my Mac.
+    There are 110 automated tests (`MOCK_AI=1 python3 -m unittest discover -s tests`). They start the real server, call every endpoint, and test the parsers, the math, sync (with a fake server), a fake Ollama, and Ollama being down. **Caveat:** the tests run on Linux, so Apple Vision itself is replaced by a stand-in that returns recorded OCR text. The real Vision path has only been tried by hand on my Mac.
 
 ### If they push further
 

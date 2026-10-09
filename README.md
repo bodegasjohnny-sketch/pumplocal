@@ -3,7 +3,7 @@
 **An offline AI assistant for small Filipino gas stations.** PumpLocal reads pump-meter and receipt photos, reads each pump's **totalizer** at shift start and end to catch fuel that left the pump without a recorded sale, flags cash mismatches at shift end, and answers staff questions in Tagalog or English. Everything runs on-device, so it keeps working through brownouts and dead internet.
 
 **Local AI = two on-device models:**
-- **Apple Vision OCR** (built into macOS) reads the digits on meter, receipt and totalizer photos. Plain code then turns the text into fields and checks the math. It is expected to take typically about a second per photo (not yet measured on the demo Mac).
+- **Apple Vision OCR** (built into macOS) reads the digits on meter, receipt and totalizer photos. Plain code then turns the text into fields and checks the math. One read took 1.8 s on the demo MacBook Air (8 GB), measured once by hand.
 - **Gemma 3 4B via Ollama** handles Tagalog/English Q&A and cash-check wording, and is the fallback photo reader when OCR can't produce numbers that add up. Records sync to the cloud once a connection comes back.
 
 Built for **AppBuildersPH Hackathon 2026**, theme: **Local AI**.
@@ -162,7 +162,7 @@ tests/        Unit + end-to-end tests
 
 ## Known limitations (v1)
 
-- Photo reading accuracy depends on the photo. Staff must review every value, which the UI asks for. Accuracy hasn't been benchmarked.
+- Photo reading accuracy depends on the photo. Staff must review every value, which the UI asks for. Accuracy hasn't been benchmarked. A photo of a whole report or closing sheet is refused with "Snap one pump display or one receipt" instead of guessing a sale.
 - The OCR parser expects labelled meters and receipts (AMOUNT/LITERS/PRICE or TOTAL/VOLUME/PRICE). Unusual layouts fall back to Gemma, which is much slower on an 8 GB laptop.
 - Apple Vision OCR needs macOS. On Linux, photos are read by Gemma only.
 - One open shift at a time and one station per install. There are no user accounts or login.
