@@ -1,0 +1,55 @@
+{
+ "width": 900,
+ "height": 700,
+ "engine": "tesseract (stand-in for Apple Vision)",
+ "lines": [
+  {
+   "text": "2.Money All",
+   "confidence": 0.946,
+   "x": 0.1767,
+   "y": 0.1643,
+   "w": 0.33,
+   "h": 0.0729
+  },
+  {
+   "text": "Volume",
+   "confidence": 0.948,
+   "x": 0.1711,
+   "y": 0.3086,
+   "w": 0.21,
+   "h": 0.0557
+  },
+  {
+   "text": "778611",
+   "confidence": 0.948,
+   "x": 0.5033,
+   "y": 0.4529,
+   "w": 0.3278,
+   "h": 0.15
+  },
+  {
+   "text": "Cancel",
+   "confidence": 0.966,
+   "x": 0.1667,
+   "y": 0.5429,
+   "w": 0.1456,
+   "h": 0.0429
+  },
+  {
+   "text": "DIESEL 2",
+   "confidence": 0.953,
+   "x": 0.3444,
+   "y": 0.75,
+   "w": 0.2989,
+   "h": 0.0671
+  },
+  {
+   "text": "SYNTHETIC SAMPLE - not a real photo",
+   "confidence": 0.953,
+   "x": 0.2611,
+   "y": 0.9029,
+   "w": 0.4589,
+   "h": 0.05
+  }
+ ]
+}

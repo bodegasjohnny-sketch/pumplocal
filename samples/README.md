@@ -12,6 +12,15 @@ These images are **synthetic**, generated with Pillow by `make_samples.py`. They
 
 In the app, tap a thumbnail under "Try a sample" on the Photo tab.
 
+| File | Shows | Expected reading |
+|---|---|---|
+| `closing_slip_photo.jpg` / `closing_slip_clean.png` | Filled Shift Closing Slip (phone photo with tilt and shadow / flat scan), made by `make_slip.py` | See `closing_slip_answer.json`: float ₱1,000; expenses ₱60 + ₱350; discounts ₱20; credit Mang Ben Diesel ₱1,000; GCash ₱500; card ₱300; cash counted ₱3,220 |
+| `synthetic_totalizer_diesel2_close_money.png` | **SYNTHETIC** Diesel 2 "2.Money All" closing screen, made by `make_totalizer_close.py` | Peso totalizer 778611 (closing) |
+| `synthetic_totalizer_diesel2_close_volume.png` | **SYNTHETIC** Diesel 2 "1.Volume All" closing screen | Liter totalizer 13564 (closing) |
+
+The closing totalizer screens imitate the layout of the real photo but are generated, with made-up closings chosen to
+fit the real opening 775397 for the Demo Day script (56 L / ₱3,214 dispensed). Each image says "SYNTHETIC SAMPLE".
+
 ## REAL photo
 
 | File | Shows | Expected reading |

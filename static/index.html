@@ -248,7 +248,7 @@
         One photo may show only one counter; save it, then photograph the other.</p>
       <label class="btn" for="pumpFile">📷 Take / Upload Totalizer Photo</label>
       <input type="file" id="pumpFile" accept="image/*" capture="environment">
-      <p class="hint" style="margin-top:12px">Try the <span class="realtag">REAL PHOTO</span> from our station (peso totalizer):</p>
+      <p class="hint" style="margin-top:12px">Try the <span class="realtag">REAL PHOTO</span> from our station (peso totalizer, opening), then the two synthetic closing screens:</p>
       <div class="samples" id="pumpSamples"></div>
       <img class="preview" id="pumpPreview" alt="Totalizer photo preview">
       <div id="pumpReadMsg"></div>
@@ -455,9 +455,12 @@
   function loadSamples() {
     api("/api/samples").then(function (j) {
       (j.pump_samples || []).forEach(function (name) {
-        var b = document.createElement("button"); b.title = name + " (REAL photo)";
+        var real = name.indexOf("real_") === 0, closing = name.indexOf("close") >= 0;
+        var b = document.createElement("button"); b.title = name + (real ? " (REAL photo, opening)" : " (SYNTHETIC, closing)");
         b.innerHTML = '<img alt="' + esc(name) + '" src="/samples/' + encodeURIComponent(name) + '">';
         b.addEventListener("click", function () {
+          // demo samples: the REAL photo is this shift's opening; the synthetic screens are closings
+          state.sampleKind = closing ? "close" : "open";
           fetch("/samples/" + encodeURIComponent(name)).then(function (r) { return r.blob(); }).then(function (bl) {
             prepImage(bl, $("pumpPreview"), extractPump); });
         });
@@ -641,6 +644,7 @@
   function loadCashExtras() {
     api("/api/shift").then(function (s) {
       if (s.error) return;
+      if (s.opening_float_preset && !$("float").value) $("float").value = s.opening_float_preset;
       $("expList").innerHTML = s.expenses.length ? "<table>" + s.expenses.map(function (e) {
         return "<tr><td>" + esc(e.created_at.slice(11, 16)) + "</td><td>" + esc(e.description) + (e.source === "photo" ? " 📷" : "") +
           '</td><td class="r"><b>' + peso(e.amount_pesos) + '</b></td><td><button class="x" data-exp="' + e.id + '">void</button></td></tr>';
@@ -926,10 +930,11 @@
     autoKind();
   }
   function setKind(k) { state.kind = k; document.querySelectorAll("#kindSeg button").forEach(function (b) { b.classList.toggle("on", b.dataset.k === k); }); pumpReadCalc(); }
-  document.querySelectorAll("#kindSeg button").forEach(function (b) { b.addEventListener("click", function () { setKind(b.dataset.k); }); });
+  document.querySelectorAll("#kindSeg button").forEach(function (b) { b.addEventListener("click", function () { state.sampleKind = null; setKind(b.dataset.k); }); });
   function selectedPump() { var id = $("pumpSel").value; return (state.pump && state.pump.check.pumps.filter(function (p) { return String(p.id) === id; })[0]) || null; }
   function autoKind() {
     var p = selectedPump(), c = state.detectedCounter || "amount";
+    if (state.sampleKind) { setKind(state.sampleKind); return; }
     setKind(p && p["opening_" + c] && !p["closing_" + c] ? "close" : (p && p["opening_" + c] ? (state.kind || "close") : "open"));
   }
   $("pumpSel").addEventListener("change", autoKind);
@@ -949,7 +954,7 @@
     if (!parts.length && !warn) { $("pumpReadCalc").textContent = "Type or read the peso and/or liter totalizer."; return; }
     $("pumpReadCalc").innerHTML = (parts.length ? "Will save " + (p ? esc(p.name) : "the new pump") + " <b>" + kindWord + "</b>: " + parts.join(" · ") : "") + warn;
   }
-  $("pumpFile").addEventListener("change", function (e) { if (e.target.files[0]) prepImage(e.target.files[0], $("pumpPreview"), extractPump); e.target.value = ""; });
+  $("pumpFile").addEventListener("change", function (e) { state.sampleKind = null; if (e.target.files[0]) prepImage(e.target.files[0], $("pumpPreview"), extractPump); e.target.value = ""; });
   function extractPump(dataUrl, full) {
     busy(true, "Reading totalizer on this computer… · Binabasa ang metro…");
     $("overlaySub").textContent = state.reader === "gemma" || !state.vision

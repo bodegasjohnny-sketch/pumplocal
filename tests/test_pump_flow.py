@@ -47,7 +47,8 @@ class PumpFlowTest(unittest.TestCase):
         code, sh = call(self.b, "/api/shift")
         self.assertEqual((sh["count"], sh["total_amount"]), (15, "16350.00"))  # seed sales unchanged
         code, samples = call(self.b, "/api/samples")
-        self.assertEqual(samples["pump_samples"], ["real_totalizer_diesel2.png"])
+        self.assertEqual(samples["pump_samples"], ["real_totalizer_diesel2.png", "synthetic_totalizer_diesel2_close_money.png",
+                                                   "synthetic_totalizer_diesel2_close_volume.png"])
         self.assertEqual(call(self.b, "/samples/real_totalizer_diesel2.png")[1][:4], b"\x89PNG")
 
     def test_2_extract_real_photo(self):
