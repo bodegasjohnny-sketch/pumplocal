@@ -64,6 +64,7 @@ Times are git commit times converted to PHT (UTC+8), from `git log`. Several com
 | 3:40–3:42 PM | **Pump totalizer v2:** both lifetime counters (pesos and liters), closing − opening for each, price-per-liter check with an optional mid-shift price change, README | `be4b879` → `58686ea` | 94 |
 | 3:44 PM | **Offline pitch deck** at `/slides` (3 slides + "Go to live demo"), header link | `ed3ccad` | 95 |
 | 4:02 PM | **Pump readings sync:** pumps and totalizer readings join the offline sync queue the same way expenses do (built by Grok Bot after Devin had no credits) | `b46cef4` | 102 |
+| 4:30 PM | **Slides:** added "How it runs at the station" (staff phones, Wi-Fi router, used Mac mini, UPS) | `17cfb66` | 102 |
 
 ## Key design decisions
 
