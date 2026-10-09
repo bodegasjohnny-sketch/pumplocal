@@ -94,5 +94,53 @@ class AskCodeTests(unittest.TestCase):
             self.assertNotIn(raw, p)
 
 
+    def test_why_and_opinion_questions_go_to_the_model(self):
+        self.assertIn("2.57 L (0.62%)", self.ask("May kulang ba sa premium?"))  # plain question stays on code
+        for q in ("ano sa tingin mo ang reason bakit may kulang sa premium?", "Bakit may kulang sa premium?",
+                  "Why is premium short?", "What's the reason premium is missing liters?", "Ano ang dahilan ng kulang?",
+                  "What do you think about the premium gap?", "Explain the premium shortage",
+                  "Ipaliwanag ang kulang sa premium", "Paano nagkaroon ng kulang sa premium?",
+                  "How come premium is short?"):
+            seen = {}
+
+            def fake_chat(messages, json_mode=False, num_predict=200):
+                seen["prompt"] = messages[-1]["content"]
+                return "Maaaring may benta na hindi naitala; 2.57 L ang hindi naitala."
+            with mock.patch.object(ai, "chat", fake_chat):
+                r = ai.ask(q, core.shift_summary())
+            self.assertEqual(r["source"], "ai", q)
+            self.assertIn("416.07 L", seen["prompt"], q)  # computed numbers still given as context
+        self.assertEqual(self.ask("How many liters of premium were sold?"),
+                         "413.500 L of Premium sold this shift (₱35,519.65, 10 sales).")  # "how" alone stays on code
+
+
+    def test_why_prompt_neutral_causes_and_blame_filter(self):
+        seen = {}
+
+        def fake_chat(messages, json_mode=False, num_predict=200):
+            seen["prompt"] = messages[-1]["content"]
+            return seen.get("reply", "Kulang ng 2.57 L. Posibleng may benta na hindi naitala.")
+        with mock.patch.object(ai, "chat", fake_chat):
+            r = ai.ask("Bakit may kulang sa premium?", core.shift_summary())
+            p = seen["prompt"]
+            for want in ("neutral possible causes", "test pour", "calibration", "counting error",
+                         "Never blame staff", "Never mention theft"):
+                self.assertIn(want, p)
+            self.assertEqual(r["source"], "ai")
+            for bad in ("Baka ninakaw ng staff ang 2.57 L.", "Maybe someone stole 2.57 L.", "Possible theft of fuel.",
+                        "Baka may nagnakaw.", "Baka may magnanakaw."):
+                seen["reply"] = bad
+                r = ai.ask("Bakit may kulang sa premium?", core.shift_summary())
+                self.assertEqual(r["source"], "ai-filtered", bad)
+                self.assertFalse(ai.BLAME_WORDS.search(r["answer"]), r["answer"])
+                self.assertIn("2.57 L", r["answer"])
+                self.assertIn("calibrat", r["answer"])
+                self.assertEqual(r["unverified_numbers"], [])
+            # plain questions keep the short prompt
+            seen["reply"] = "OK"
+            ai.ask("Ano ang lagay ng shift?", core.shift_summary())
+            self.assertNotIn("neutral possible causes", seen["prompt"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -47,7 +47,7 @@ class AskPromptTests(unittest.TestCase):
         self.assertEqual((r["answer"], r["source"], r["lang"]), ("Ang benta ng diesel ngayon ay ₱10,000.00.", "ai", "tl"))
         self.assertEqual(r["unverified_numbers"], [])
         p = seen["prompt"]
-        self.assertIn("1-2 short sentences", p)
+        self.assertIn("3-4 short sentences", p)  # a why-question (bakit): neutral causes allowed
         self.assertIn("Do not add disclaimers", p)
         self.assertIn("Only if the number needed is truly missing", p)
 

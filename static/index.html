@@ -1180,12 +1180,13 @@
     api("/api/ask", { question: q }).then(function (j) {
       if (j.error) { pending.innerHTML = "⚠️ " + esc(j.error); return; }
       var src = { ai: "🤖 Local AI (" + state.model + ") · numbers from PumpLocal", template: "Template answer (mock mode)", code: "🧮 Computed by PumpLocal (code, exact numbers)",
-        "template-fallback": "Local AI unavailable · answered directly from the totals" }[j.source] || j.source;
+        "template-fallback": "Local AI unavailable · answered directly from the totals",
+        "ai-filtered": "🤖 Local AI reply replaced with a neutral answer (numbers from PumpLocal)" }[j.source] || j.source;
       var html = esc(j.answer);
       if (j.unverified_numbers && j.unverified_numbers.length)
         html += '<div class="note warn">⚠️ Check: ' + esc(j.unverified_numbers.join(", ")) + " not found in this shift's data. See the Shift tab.</div>";
       html += '<span class="src">' + esc(src) + "</span>";
-      html += "<details><summary>Data given to the AI</summary><pre>" + esc(j.context) + "</pre></details>";
+      html += "<details><summary>" + (j.source === "code" ? "Numbers used" : "Data given to the AI") + "</summary><pre>" + esc(j.context) + "</pre></details>";
       pending.innerHTML = html;
     });
   }

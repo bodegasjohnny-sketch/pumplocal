@@ -801,9 +801,15 @@ def _n_sales(n, lang):
     return ("%d benta" % n) if lang == "tl" else ("%d sale%s" % (n, "" if n == 1 else "s"))
 
 
+# Why/opinion questions go to the model (with the computed numbers as DATA), even if they mention kulang/premium.
+# Oct 9 Mac test: "ano sa tingin mo ang reason bakit may kulang sa premium?" got the plain "may kulang" template.
+WHY_QUESTION = re.compile(r"\b(bakit|why|reasons?|dahilan|sa tingin mo|what do you think|explain|ipaliwanag|paano|"
+                          r"how come)\b", re.I)
+
+
 def code_answer(question, s, lang):
     """Exact answer from code for the fixed questions, in the question's language, or None (free-form -> model)."""
-    if not s or "fuels" not in s:
+    if not s or "fuels" not in s or WHY_QUESTION.search(question or ""):
         return None
     q = " %s " % re.sub(r"\s+", " ", (question or "").lower().replace("gcash", "e-wallet"))
     fuel = _fuel_in(q)
@@ -898,6 +904,23 @@ def strip_cant_answer(answer, context):
     return " ".join(kept)
 
 
+BLAME_WORDS = re.compile(r"(nagnakaw|ninakaw|magnanakaw|nakaw|pagnanakaw|\bsteal\w*|\bstole\w*|\btheft\b|\bthie(f|ves)\b|"
+                         r"\bpilfer\w*|\bembezzl\w*)", re.I)
+
+
+def neutral_why_answer(question, s, lang):
+    """Used when a model reply blames someone: the computed gap (code) + neutral causes + one check."""
+    base = pump_answer(question, s, lang) or ""
+    if lang == "tl":
+        tail = ("Posibleng dahilan: may benta na hindi naitala, may manual o test pour na hindi nailista, o kailangan "
+                "i-calibrate ang pump. Suriin: ikumpara ang logbook sa sale history ng pump at gumawa ng calibration "
+                "test gamit ang panukat na lalagyan.")
+    else:
+        tail = ("Possible causes: a sale that wasn't recorded, a manual or test pour that wasn't logged, or a pump that "
+                "needs calibration. Check: compare the logbook with the pump's sale history and do a calibration test with a measuring can.")
+    return (base + " " + tail).strip()
+
+
 def ask(question, s):
     lang = detect_lang(question)
     context = summary_context(s)
@@ -908,19 +931,28 @@ def ask(question, s):
         answer, source = template_answer(question, s, lang), "template"
     else:
         language = "Tagalog" if lang == "tl" else "English"
+        why = bool(WHY_QUESTION.search(question or ""))
+        why_rules = ("- This is a why-question: give the gap from DATA, then 2-3 neutral possible causes (a sale "
+                     "that was not recorded, a manual or test pour that was not logged, a pump that needs calibration, "
+                     "a counting error) and suggest one check (e.g. compare the logbook with the pump's sale history, "
+                     "do a calibration test with a measuring can, recount).\n"
+                     "- Never blame staff or accuse anyone. Never mention theft or stealing.\n") if why else ""
         prompt = ("You help staff at a small Philippine gas station. DATA (computed by the system, trust it):\n"
                   "%s\n\nQUESTION: %s\n\nRULES:\n"
-                  "- Answer in %s in 1-2 short sentences.\n"
+                  "- Answer in %s in %s short sentences.\n"
+                  "%s"
                   "- Use only numbers that appear in DATA. Do not calculate new numbers.\n"
                   "- For questions about missing or unrecorded fuel (e.g. 'may kulang ba sa diesel?'), use the Pump "
                   "meters lines.\n"
                   "- If DATA answers the question, just answer it. Do not add disclaimers, caveats or notes about the "
                   "data.\n"
                   "- Only if the number needed is truly missing from DATA, say in one sentence that the data doesn't "
-                  "have it." % (context, question, language))
+                  "have it." % (context, question, language, "3-4" if why else "1-2", why_rules))
         try:
-            answer, source = chat([{"role": "user", "content": prompt}], num_predict=120).strip(), "ai"
+            answer, source = chat([{"role": "user", "content": prompt}], num_predict=220 if why else 120).strip(), "ai"
             answer = strip_cant_answer(answer, context)
+            if BLAME_WORDS.search(answer):  # never let the model accuse anyone; replace with a neutral answer
+                answer, source = neutral_why_answer(question, s, lang), "ai-filtered"
         except AIError as e:
             answer = template_answer(question, s, lang)
             source = "template-fallback"
