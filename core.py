@@ -3,15 +3,11 @@
 Everything here is Python 3 standard library only (works with macOS system python3).
 All arithmetic on money and liters is done in this file with Decimal -- never by the model.
 """
-import base64
-import json
+import contextlib
 import os
 import re
 import sqlite3
 import threading
-import time
-import urllib.error
-import urllib.request
 from datetime import datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
@@ -197,10 +193,16 @@ def now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+@contextlib.contextmanager
 def connect():
+    """Open, commit and always close a SQLite connection."""
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def init_db():
