@@ -87,8 +87,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/samples":
             files = sorted(f for f in os.listdir(SAMPLES) if f.lower().endswith((".png", ".jpg")))
             pump = [f for f in files if "totalizer" in f.lower()]
-            # "samples" = sale photos (Photo tab); "pump_samples" = totalizer photos (Pump tab)
-            return self.send_json({"samples": [f for f in files if f not in pump], "pump_samples": pump})
+            other = [f for f in files if f.lower().startswith("closing_sheet")]
+            # "samples" = sale photos (Photo tab); "pump_samples" = totalizer photos (Pump tab);
+            # "other_samples" = e.g. the closing-sheet form images (not a single sale)
+            return self.send_json({"samples": [f for f in files if f not in pump and f not in other],
+                                   "pump_samples": pump, "other_samples": other})
         if path == "/api/status":
             return self.send_json(status_payload())
         if path == "/api/shift":

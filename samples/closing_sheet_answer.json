@@ -1,0 +1,218 @@
+{
+  "_note": "Synthetic sample (all numbers made up). Layout modeled on the JCB Gas Station daily petty cash + daily sales report form. Amounts in PHP, volumes in liters.",
+  "form": "JCB GAS STATION DAILY PETTY CASH REPORT FORM + DAILY SALES REPORT FORM",
+  "station": "JCB GAS STATION",
+  "date": "2026-10-09",
+  "date_printed": "09 OCT 2026",
+  "shift": "6:00 AM - 2:00 PM",
+  "pump_attendant": null,
+  "attendant_line": "Attendant: ________",
+  "machines": [
+    {
+      "machine": "MACHINE 1",
+      "product": "UNLEADED",
+      "pump_price": 80.35,
+      "opening_volume": 4682.47,
+      "closing_volume": 4791.11,
+      "liters_sold": 108.64,
+      "sales_amount": 8729.22,
+      "money_all": 385210,
+      "coin": 0,
+      "bank": 385210
+    },
+    {
+      "machine": "MACHINE 2",
+      "product": "DIESEL",
+      "pump_price": 79.85,
+      "opening_volume": 3871.29,
+      "closing_volume": 4102.76,
+      "liters_sold": 231.47,
+      "sales_amount": 18482.88,
+      "money_all": 327645,
+      "coin": 0,
+      "bank": 327645
+    },
+    {
+      "machine": "MACHINE 3",
+      "product": "PREMIUM",
+      "pump_price": 81.95,
+      "opening_volume": 17302.54,
+      "closing_volume": 17489.9,
+      "liters_sold": 187.36,
+      "sales_amount": 15354.15,
+      "money_all": 1433318,
+      "coin": 0,
+      "bank": 1433318
+    },
+    {
+      "machine": "MACHINE 4",
+      "product": "PREMIUM",
+      "pump_price": 81.95,
+      "opening_volume": 4196.62,
+      "closing_volume": 4338.8,
+      "liters_sold": 142.18,
+      "sales_amount": 11651.65,
+      "money_all": 355541,
+      "coin": 0,
+      "bank": 355541
+    }
+  ],
+  "total_sales": 54217.9,
+  "liters_by_product": {
+    "UNLEADED": 108.64,
+    "DIESEL": 231.47,
+    "PREMIUM": 329.54
+  },
+  "total_liters": 669.65,
+  "petty_cash_in": {
+    "counts": {
+      "1": 50,
+      "5": 20,
+      "10": 25,
+      "20": 5,
+      "50": 20,
+      "100": 20,
+      "200": 0,
+      "500": 0,
+      "1000": 0
+    },
+    "amounts": {
+      "1": 50,
+      "5": 100,
+      "10": 250,
+      "20": 100,
+      "50": 1000,
+      "100": 2000,
+      "200": 0,
+      "500": 0,
+      "1000": 0
+    },
+    "total": 3500
+  },
+  "petty_cash_out": {
+    "counts": {
+      "1": 25,
+      "5": 14,
+      "10": 22,
+      "20": 19,
+      "50": 28,
+      "100": 43,
+      "200": 6,
+      "500": 22,
+      "1000": 34
+    },
+    "amounts": {
+      "1": 25,
+      "5": 70,
+      "10": 220,
+      "20": 380,
+      "50": 1400,
+      "100": 4300,
+      "200": 1200,
+      "500": 11000,
+      "1000": 34000
+    },
+    "total": 52595.0
+  },
+  "expenses": [
+    {
+      "amount": 220.0,
+      "details": "REBATES - FLEET DISC 1.00/L x 220L"
+    },
+    {
+      "amount": 60.0,
+      "details": "ICE (2 BAGS)"
+    },
+    {
+      "amount": 100.0,
+      "details": "LOAD - STATION PHONE"
+    },
+    {
+      "amount": 145.0,
+      "details": "CLEANING SUPPLIES (ZONROX, RAGS)"
+    },
+    {
+      "amount": 200.0,
+      "details": "CASH ADVANCE - ATTENDANT"
+    }
+  ],
+  "discounts": [
+    {
+      "amount": 220.0,
+      "details": "REBATES - FLEET DISC 1.00/L x 220L",
+      "note": "rebate/discount, recorded as an expense line like on the real form"
+    }
+  ],
+  "total_expenses": 725.0,
+  "oil_and_lubricants": [
+    {
+      "product": "TOP UP",
+      "qty": 1,
+      "unit_price": 120.0,
+      "total": 120.0
+    },
+    {
+      "product": "COOLANT 1L",
+      "qty": 1,
+      "unit_price": 180.0,
+      "total": 180.0
+    },
+    {
+      "product": "MOTOR OIL 1L",
+      "qty": 2,
+      "unit_price": 285.0,
+      "total": 570.0
+    }
+  ],
+  "oil_and_lubricants_total": 870.0,
+  "expenses_outside_petty_cash": [],
+  "collections": [
+    {
+      "name": "FLEET ACCT A (CHARGE)",
+      "amount": 2450.0,
+      "debt_date": "09/10/26",
+      "remarks": "CREDIT - PAY 30 DAYS"
+    },
+    {
+      "name": "GCASH",
+      "amount": 1280.0,
+      "debt_date": null,
+      "remarks": "REF ...4821"
+    },
+    {
+      "name": "CARD (DEBIT)",
+      "amount": 1500.0,
+      "debt_date": null,
+      "remarks": "APPROVAL 503318"
+    }
+  ],
+  "credit_charge_sales": 2450.0,
+  "gcash": 1280.0,
+  "card": 1500.0,
+  "total_collections": 5230.0,
+  "summary_petty_cash": 3500,
+  "opening_float": 3500,
+  "total_cash_expenses_collections": 58550.0,
+  "expected_cash": 52632.9,
+  "actual_cash": 52595.0,
+  "over_short": -37.9,
+  "short": 37.9,
+  "over": 0,
+  "formulas": {
+    "liters_sold": "closing_volume - opening_volume (VOLUME - PREV VOLUME)",
+    "sales_amount": "round_half_up(liters_sold * pump_price, 2)  (MC on the form; V = liters_sold)",
+    "total_sales": "sum of machine sales_amount",
+    "expected_cash": "total_sales + oil_and_lubricants_total + petty_cash_in.total - total_expenses - total_collections",
+    "actual_cash": "petty_cash_out.total (cash counted by denomination)",
+    "over_short": "actual_cash - expected_cash (negative = short)",
+    "total_cash_expenses_collections": "actual_cash + total_expenses + total_collections"
+  },
+  "blank_on_form": [
+    "ACTUAL COLLECTIONS (MA/BILLS/COINS/DIFF)",
+    "SALES MA/C/B",
+    "INVENTORY",
+    "OUTSOURCING PURCHASES",
+    "EXPENSES OUTSIDE PETTY CASH",
+    "signatures"
+  ]
+}
