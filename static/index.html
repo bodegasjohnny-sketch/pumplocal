@@ -97,7 +97,7 @@
   .msg .src { display:block; font-size:11.5px; color:var(--muted); margin-top:6px; }
   .askrow { display:flex; gap:8px; } .askrow input { flex:1; font-size:17px; }
   .askrow .btn { width:auto; padding:0 20px; }
-  nav { position:fixed; bottom:0; left:0; right:0; background:#fff; display:grid; grid-template-columns:repeat(4,1fr);
+  nav { position:fixed; bottom:0; left:0; right:0; background:#fff; display:grid; grid-template-columns:repeat(5,1fr);
     border-top:1px solid var(--line); padding-bottom:env(safe-area-inset-bottom); z-index:10; box-shadow:0 -2px 10px rgba(0,0,0,.06); }
   nav button { background:none; border:0; padding:10px 4px 12px; font-size:12.5px; color:var(--muted); cursor:pointer; font-weight:600; }
   nav button .ic { display:block; font-size:24px; line-height:1.1; }
@@ -115,6 +115,20 @@
   .seg button.on { background:var(--navy); color:#fff; }
   .flex { display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
   details summary { cursor:pointer; color:var(--muted); font-size:13px; }
+  .result.UNACCOUNTED, .result.OVER_RECORDED, .result.ERROR { background:var(--red); }
+  .result.INCOMPLETE, .result.NONE { background:#5c677d; }
+  .result .head { font-size:17px; font-weight:700; margin-top:6px; line-height:1.35; }
+  .pumpcard { border:2px solid var(--line); border-radius:14px; padding:12px; margin-bottom:12px; }
+  .pumpcard.flag { border-color:var(--red); }
+  .pumpcard h3 { margin:0; font-size:18px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .pumpcard .disp { font-size:14px; margin-top:8px; color:var(--muted); }
+  .pumpcard .disp b { color:var(--ink); }
+  .pumpcard .err { color:#8a1c25; font-weight:700; }
+  select.sel { font-size:16px; padding:10px; border:2px solid var(--line); border-radius:10px; background:#fbfcfe; color:var(--ink); width:100%; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .row4 { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  @media (max-width:520px) { .row4 { grid-template-columns:1fr 1fr; } }
+  .realtag { display:inline-block; background:var(--yellow); color:var(--navy); font-weight:800; font-size:11px; padding:1px 6px; border-radius:6px; }
   pre { white-space:pre-wrap; font-size:12.5px; background:#f4f7fb; padding:8px; border-radius:8px; }
 </style>
 </head>
@@ -182,11 +196,66 @@
     </div>
   </section>
 
+  <!-- PUMP TOTALIZER (Metro ng Pump) -->
+  <section class="tab" id="tab-pump">
+    <div class="card">
+      <div class="flex"><h2>Pump <span class="tl">· Metro ng Pump</span></h2>
+        <span class="seg langseg"><button data-l="en" class="on">EN</button><button data-l="tl">TL</button></span></div>
+      <p class="hint">Record each pump's totalizer at shift start (opening) and shift end (closing). PumpLocal computes how much
+        the pump dispensed and compares it with the sales recorded this shift. All math is done in code.</p>
+      <div id="pumpGaps"></div>
+      <div style="height:12px"></div>
+      <button class="btn navy" id="pumpExplainBtn">🤖 Explain · Ipaliwanag (local AI)</button>
+      <div id="pumpExplain"></div>
+      <div class="flex" style="margin-top:12px;justify-content:flex-start">
+        <label for="pumpTol" style="font-weight:600;font-size:14px">Tolerance <span style="font-weight:400;color:#5c677d">· Palugit</span></label>
+        <input class="txt" id="pumpTol" inputmode="decimal" style="width:90px;font-size:17px;padding:8px">%
+        <button class="btn small ghost" id="pumpTolBtn">Save</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Totalizer photo <span class="tl">· Litrato ng metro</span></h2>
+      <p class="hint">Photograph the pump's totalizer screen. Apple Vision OCR reads it on this computer (Gemma only as fallback); you check it, then save.</p>
+      <label class="btn" for="pumpFile">📷 Take / Upload Totalizer Photo</label>
+      <input type="file" id="pumpFile" accept="image/*" capture="environment">
+      <p class="hint" style="margin-top:12px">Try the <span class="realtag">REAL PHOTO</span> from our station:</p>
+      <div class="samples" id="pumpSamples"></div>
+      <img class="preview" id="pumpPreview" alt="Totalizer photo preview">
+      <div id="pumpReadMsg"></div>
+      <div id="pumpReadForm" style="display:none">
+        <div class="row2">
+          <div><label class="f" for="pumpSel">Pump <span class="tl">· Alin</span></label><select class="sel" id="pumpSel"></select></div>
+          <div><label class="f">Reading is <span class="tl">· Uri</span></label>
+            <span class="seg" id="kindSeg"><button data-k="open" class="on">Opening</button><button data-k="close">Closing</button></span></div>
+        </div>
+        <label class="f" for="pumpReading">Totalizer reading (digits as shown) <span class="tl">· Numero sa metro</span></label>
+        <input class="num" id="pumpReading" inputmode="decimal" placeholder="775397">
+        <div class="calc" id="pumpReadCalc"></div>
+        <button class="btn green" id="pumpReadSave">💾 Save reading · I-save</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Pumps <span class="tl">· Mga pump at nozzle</span></h2>
+      <p class="hint">Unit and hidden decimals are per pump: 775397 with 2 decimals means 7,753.97; with 3, 775.397.</p>
+      <div id="pumpList"></div>
+      <details id="addPumpBox"><summary>＋ Add a pump · Magdagdag</summary>
+        <div class="row4" style="margin-top:8px">
+          <div><label class="f" for="newPumpName">Name</label><input class="txt" id="newPumpName" placeholder="Diesel 2" style="font-size:16px;padding:10px"></div>
+          <div><label class="f" for="newPumpFuel">Fuel</label><select class="sel" id="newPumpFuel"><option>Diesel</option><option>Premium</option><option>Unleaded</option></select></div>
+          <div><label class="f" for="newPumpUnit">Unit</label><select class="sel" id="newPumpUnit"><option value="L">Liters</option><option value="PHP">Pesos</option></select></div>
+          <div><label class="f" for="newPumpDec">Decimals</label><select class="sel" id="newPumpDec"><option>0</option><option>1</option><option>2</option><option>3</option></select></div>
+        </div>
+        <div style="height:10px"></div>
+        <button class="btn small navy" id="addPumpBtn">Add pump</button>
+      </details>
+    </div>
+  </section>
+
   <!-- 2. CASH CHECK -->
   <section class="tab" id="tab-cash">
     <div class="card">
       <div class="flex"><h2>Cash Check <span class="tl">· Bilang ng pera</span></h2>
-        <span class="seg" id="langSeg"><button data-l="en" class="on">EN</button><button data-l="tl">TL</button></span></div>
+        <span class="seg langseg" id="langSeg"><button data-l="en" class="on">EN</button><button data-l="tl">TL</button></span></div>
       <p class="hint">At shift end, count the cash drawer. PumpLocal computes the expected cash from saved sales and flags any difference.</p>
       <label class="f" for="declared">Declared cash ₱ <span class="tl">· Perang nasa kaha</span></label>
       <input class="num" id="declared" inputmode="decimal" placeholder="₱0.00">
@@ -212,6 +281,7 @@
         <button>What are total sales this shift?</button>
         <button>Ilang litro ng Premium ang nabenta?</button>
         <button>May kulang ba sa cash?</button>
+        <button>May kulang ba sa diesel?</button>
       </div>
       <form class="askrow" id="askForm">
         <input class="txt" id="question" placeholder="Type a question… / Magtanong…" autocomplete="off">
@@ -225,6 +295,7 @@
 <nav>
   <button data-tab="photo" class="active"><span class="ic">📷</span>Photo</button>
   <button data-tab="sales"><span class="ic">⛽</span>Shift</button>
+  <button data-tab="pump"><span class="ic">📟</span>Pump</button>
   <button data-tab="cash"><span class="ic">💵</span>Cash</button>
   <button data-tab="ask"><span class="ic">💬</span>Ask</button>
 </nav>
@@ -265,6 +336,7 @@
     document.querySelectorAll("nav button").forEach(function (x) { x.classList.toggle("active", x.dataset.tab === name); });
     document.querySelectorAll(".tab").forEach(function (x) { x.classList.toggle("active", x.id === "tab-" + name); });
     if (name === "sales") loadShift();
+    if (name === "pump") loadPump();
     window.scrollTo(0, 0);
   }
 
@@ -303,6 +375,15 @@
   // ---------- photo
   function loadSamples() {
     api("/api/samples").then(function (j) {
+      (j.pump_samples || []).forEach(function (name) {
+        var b = document.createElement("button"); b.title = name + " (REAL photo)";
+        b.innerHTML = '<img alt="' + esc(name) + '" src="/samples/' + encodeURIComponent(name) + '">';
+        b.addEventListener("click", function () {
+          fetch("/samples/" + encodeURIComponent(name)).then(function (r) { return r.blob(); }).then(function (bl) {
+            prepImage(bl, $("pumpPreview"), extractPump); });
+        });
+        $("pumpSamples").appendChild(b);
+      });
       (j.samples || []).forEach(function (name) {
         var b = document.createElement("button"); b.title = name;
         b.innerHTML = '<img alt="' + esc(name) + '" src="/samples/' + encodeURIComponent(name) + '">';
@@ -315,7 +396,8 @@
   }
   $("file").addEventListener("change", function (e) { if (e.target.files[0]) handleImage(e.target.files[0]); e.target.value = ""; });
 
-  function handleImage(blob) {
+  function handleImage(blob) { prepImage(blob, $("preview"), extract); }
+  function prepImage(blob, previewEl, done) {
     var url = URL.createObjectURL(blob);
     var img = new Image();
     img.onload = function () {
@@ -329,8 +411,8 @@
       }
       var dataUrl = scaled(768, 0.88);
       var full = state.reader !== "gemma" ? scaled(1600, 0.92) : null;
-      $("preview").src = dataUrl; $("preview").style.display = "block";
-      extract(dataUrl, full);
+      previewEl.src = dataUrl; previewEl.style.display = "block";
+      done(dataUrl, full);
     };
     img.onerror = function () { toast("Could not open that image."); };
     img.src = url;
@@ -439,8 +521,9 @@
 
   // ---------- cash check
   function setLang(l) { state.lang = l; localStorage.setItem("pl_lang", l);
-    document.querySelectorAll("#langSeg button").forEach(function (b) { b.classList.toggle("on", b.dataset.l === l); }); }
-  document.querySelectorAll("#langSeg button").forEach(function (b) { b.addEventListener("click", function () { setLang(b.dataset.l); }); });
+    document.querySelectorAll(".langseg button").forEach(function (b) { b.classList.toggle("on", b.dataset.l === l); });
+    if (state.pump) renderPumpGaps(state.pump.check); }
+  document.querySelectorAll(".langseg button").forEach(function (b) { b.addEventListener("click", function () { setLang(b.dataset.l); }); });
   setLang(state.lang);
 
   $("cashBtn").addEventListener("click", function () {
@@ -464,9 +547,186 @@
           '<div class="ainote"><small>' + (j.explanation_source === "ai" ? "🤖 AI note (wording only; numbers computed by PumpLocal)" :
             "Note (template" + (j.explanation_source === "template-fallback" ? ", local AI unavailable" : "") + ")") +
           "</small>" + esc(j.explanation) + "</div>" +
-          "<div style='font-size:12px;opacity:.85;margin-top:8px'>Differences within " + peso(r.tolerance) + " count as a match.</div></div>";
+          "<div style='font-size:12px;opacity:.85;margin-top:8px'>Differences within " + peso(r.tolerance) + " count as a match.</div></div>" +
+          pumpSummaryHtml(j.pump_check);
         renderSync(j.sync);
       });
+  });
+
+  // ---------- pump totalizer (Metro ng Pump)
+  var STATUS_LABEL = {
+    UNACCOUNTED: ["❌ UNACCOUNTED FUEL", "❌ MAY HINDI NAITALA"], OVER_RECORDED: ["⚠️ MORE SALES THAN PUMP", "⚠️ SOBRA ANG NAITALA"],
+    ERROR: ["❌ CHECK READING", "❌ SURIIN ANG READING"], OK: ["✅ MATCH", "✅ TUGMA"], INCOMPLETE: ["⏳ WAITING", "⏳ HINIHINTAY"] };
+  function statusLabel(st) { var x = STATUS_LABEL[st] || [st, st]; return state.lang === "tl" ? x[1] : x[0]; }
+  function headlineOf(g) { return state.lang === "tl" ? g.headline_tl : g.headline; }
+  function gapCard(g) {
+    var extra = g.flag && g.status !== "ERROR" ? "<div style='font-size:13px;opacity:.9;margin-top:6px'>" +
+      (state.lang === "tl" ? "Lampas sa " + esc(g.tolerance_pct) + "% na palugit." : "Over the " + esc(g.tolerance_pct) + "% tolerance.") + "</div>" :
+      (g.status === "OK" ? "<div style='font-size:13px;opacity:.9;margin-top:6px'>Tolerance " + esc(g.tolerance_pct) + "%</div>" : "");
+    return '<div class="result ' + esc(g.status) + '"><div style="font-size:13px;font-weight:700;opacity:.9">⛽ ' + esc(g.fuel_type) +
+      " · " + esc(g.pumps.join(", ")) + '</div><div class="big" style="font-size:24px">' + statusLabel(g.status) + "</div>" +
+      '<div class="head">' + esc(headlineOf(g)) + "</div>" + extra + "</div>";
+  }
+  function renderPumpGaps(check) {
+    if (!check) return;
+    $("pumpGaps").innerHTML = check.groups.length ? check.groups.map(gapCard).join("") :
+      '<div class="note info">No pump readings yet this shift. Add a pump below and record its opening reading. · Wala pang reading.</div>';
+  }
+  function pumpSummaryHtml(check) {
+    if (!check || !check.groups || !check.groups.length) return "";
+    return '<div style="margin-top:14px;font-weight:800;color:#0b2545">⛽ Pump meters vs sales · Metro vs benta</div>' +
+      check.groups.map(gapCard).join("");
+  }
+  function loadPump() {
+    return api("/api/pump").then(function (j) { if (j.error) { toast(j.error); return; } renderPump(j); });
+  }
+  function renderPump(j) {
+    state.pump = j;
+    renderPumpGaps(j.check);
+    if (document.activeElement !== $("pumpTol")) $("pumpTol").value = j.tolerance_pct;
+    var opt = function (v, label, cur) { return '<option value="' + esc(v) + '"' + (String(v) === String(cur) ? " selected" : "") + ">" + esc(label) + "</option>"; };
+    var src = function (s) { return s === "photo" ? " 📷" : s === "seed" ? " (demo)" : s === "carried" ? " (last shift)" : ""; };
+    $("pumpList").innerHTML = j.check.pumps.length ? j.check.pumps.map(function (p) {
+      var u = p.unit === "PHP" ? "pesos" : "L";
+      var disp = p.status === "ERROR" ? '<span class="err">⚠️ ' + esc(p.error) + "</span>" :
+        p.status === "OK" ? "Dispensed · Nailabas: <b>" + esc(p.dispensed_text) + "</b>" :
+        p.status === "INCOMPLETE" ? "Waiting for the " + (p.opening ? "closing" : "opening") + " reading." : "No readings this shift.";
+      var scaled = p.decimals && p.opening_value ? " · with " + p.decimals + " hidden decimals: " + esc(p.opening_value) +
+        (p.closing_value ? " → " + esc(p.closing_value) : "") + " " + u : "";
+      return '<div class="pumpcard' + (p.status === "ERROR" ? " flag" : "") + '" data-pid="' + p.id + '">' +
+        "<h3>" + esc(p.name) + ' <span class="chip ' + fuelClass(p.fuel_type) + '">' + esc(p.fuel_type) + "</span></h3>" +
+        '<div class="row4">' +
+        '<div><label class="f">Opening' + esc(src(p.opening_source)) + '</label><input class="txt" data-k="open" inputmode="decimal" style="font-size:17px;padding:10px" value="' + esc(p.opening || "") + '" placeholder="—"></div>' +
+        '<div><label class="f">Closing' + esc(src(p.closing_source)) + '</label><input class="txt" data-k="close" inputmode="decimal" style="font-size:17px;padding:10px" value="' + esc(p.closing || "") + '" placeholder="—"></div>' +
+        '<div><label class="f">Unit</label><select class="sel" data-f="unit">' + opt("L", "Liters", p.unit) + opt("PHP", "Pesos", p.unit) + "</select></div>" +
+        '<div><label class="f">Decimals</label><select class="sel" data-f="decimals">' + [0, 1, 2, 3].map(function (d) { return opt(d, d, p.decimals); }).join("") + "</select></div>" +
+        "</div>" +
+        '<div class="disp">' + disp + scaled + "</div>" +
+        '<div style="height:8px"></div><button class="btn small green" data-save="' + p.id + '">💾 Save</button></div>';
+    }).join("") : '<p class="hint">No pumps yet. Add one below, or read a totalizer photo.</p>';
+    fillPumpSelect(state.detected);
+  }
+  function fillPumpSelect(detected) {
+    var j = state.pump; if (!j) return;
+    var sel = $("pumpSel"), cur = sel.value, html = "", match = null;
+    j.pumps.forEach(function (p) {
+      if (detected && detected.name && p.name.toLowerCase() === detected.name.toLowerCase()) match = String(p.id);
+      html += '<option value="' + p.id + '">' + esc(p.name) + " (" + esc(p.fuel_type) + ")</option>";
+    });
+    if (detected && detected.name && !match) html += '<option value="new">＋ New pump: ' + esc(detected.name) + "</option>";
+    sel.innerHTML = html || '<option value="">Add a pump first</option>';
+    sel.value = detected && detected.name ? (match || "new") : cur;
+    if (!sel.value && sel.options.length) sel.selectedIndex = 0;
+    autoKind();
+  }
+  function setKind(k) { state.kind = k; document.querySelectorAll("#kindSeg button").forEach(function (b) { b.classList.toggle("on", b.dataset.k === k); }); pumpReadCalc(); }
+  document.querySelectorAll("#kindSeg button").forEach(function (b) { b.addEventListener("click", function () { setKind(b.dataset.k); }); });
+  function selectedPump() { var id = $("pumpSel").value; return (state.pump && state.pump.check.pumps.filter(function (p) { return String(p.id) === id; })[0]) || null; }
+  function autoKind() { var p = selectedPump(); setKind(p && p.opening && !p.closing ? "close" : (p && p.opening ? (state.kind || "close") : "open")); }
+  $("pumpSel").addEventListener("change", autoKind);
+  $("pumpReading").addEventListener("input", pumpReadCalc);
+  function pumpReadCalc() {
+    var p = selectedPump(), v = $("pumpReading").value.replace(/[\s,]/g, ""), kindWord = state.kind === "close" ? "CLOSING" : "OPENING";
+    if (!v) { $("pumpReadCalc").textContent = "Type or read the number shown on the pump."; return; }
+    if (!/^\d+(\.\d+)?$/.test(v)) { $("pumpReadCalc").innerHTML = '<span style="color:#8a1c25">Digits only, e.g. 775397.</span>'; return; }
+    if (!p) { $("pumpReadCalc").innerHTML = "Will add the pump, then save " + esc(v) + " as its <b>" + kindWord + "</b> reading (liters, 0 decimals; change on the pump card)."; return; }
+    var val = v.indexOf(".") >= 0 ? v : (p.decimals ? (Number(v) / Math.pow(10, p.decimals)).toFixed(p.decimals) : v);
+    var msg = "Will save as " + esc(p.name) + " <b>" + kindWord + "</b>: " + esc(v) + " = <b>" + esc(val) +
+      (p.unit === "PHP" ? " pesos" : " L") + "</b> (" + p.decimals + " decimals)";
+    var other = state.kind === "close" ? p.opening_value : p.closing_value;
+    if (other !== null && other !== undefined && (state.kind === "close" ? Number(val) < Number(other) : Number(val) > Number(other)))
+      msg += '<div class="note err">⚠️ Closing would be lower than opening (' + esc(state.kind === "close" ? other : val) + "). Check the photo and decimals.</div>";
+    $("pumpReadCalc").innerHTML = msg;
+  }
+  $("pumpFile").addEventListener("change", function (e) { if (e.target.files[0]) prepImage(e.target.files[0], $("pumpPreview"), extractPump); e.target.value = ""; });
+  function extractPump(dataUrl, full) {
+    busy(true, "Reading totalizer on this computer… · Binabasa ang metro…");
+    $("overlaySub").textContent = state.reader === "gemma" || !state.vision
+      ? "Gemma (" + state.model + ") is reading the photo. This can take a few minutes on a laptop."
+      : "Apple Vision OCR first (expected to take about a second). Gemma only if no Volume/Total number is found.";
+    var body = { image: dataUrl }; if (full) body.image_full = full;
+    var ready = state.pump ? Promise.resolve() : loadPump();
+    Promise.all([api("/api/pump/extract", body), ready]).then(function (res) {
+      var j = res[0];
+      busy(false);
+      $("overlaySub").textContent = "Running on this computer. The first request can take a minute while the model loads.";
+      state.detected = { name: j.pump_name || "", fuel: j.fuel_type || "" };
+      $("pumpReadForm").style.display = "block";
+      $("pumpReading").value = j.reading || "";
+      fillPumpSelect(state.detected);
+      state.pumpSource = j.ok ? "photo" : "manual";
+      var html = readerLine(j);
+      if (j.fallback_reason) html += '<div class="note warn">' + esc(j.fallback_reason) + "</div>";
+      if (j.ok) {
+        html += '<div class="note info">' + esc(j.message) + (j.pump_name ? " Label: <b>" + esc(j.pump_name) + "</b>." : "") +
+          (j.label ? " Next to: <b>" + esc(j.label) + "</b>" + (j.unit_hint ? " (looks like " + (j.unit_hint === "PHP" ? "pesos" : "liters") + "; the unit is set per pump)" : "") + "." : "") + "</div>";
+      } else html += '<div class="note err">⚠️ ' + esc(j.message || j.error) + "</div>";
+      (j.notes || []).forEach(function (n) { html += '<div class="note warn">' + esc(n) + "</div>"; });
+      if (j.raw) html += "<details><summary>" + (j.reader === "vision" ? "OCR text" : "Model output") + "</summary><pre>" + esc(j.raw) + "</pre></details>";
+      $("pumpReadMsg").innerHTML = html;
+      pumpReadCalc();
+    });
+  }
+  function afterPumpSave(j, okMsg) {
+    if (j.error) { toast(j.error, 3500); return false; }
+    renderPump(j); $("pumpExplain").innerHTML = "";
+    (j.warnings || []).forEach(function (w) { toast("⚠️ " + w, 6000); });
+    if (!(j.warnings || []).length && okMsg) toast(okMsg);
+    return true;
+  }
+  $("pumpReadSave").addEventListener("click", function () {
+    var reading = $("pumpReading").value, id = $("pumpSel").value, kind = state.kind;
+    if (!reading) { toast("Enter the reading · Ilagay ang numero"); return; }
+    var go = function (pid) {
+      return api("/api/pump/reading", { pump_id: Number(pid), kind: kind, reading: reading, source: state.pumpSource || "manual" })
+        .then(function (j) {
+          state.detected = null;
+          if (afterPumpSave(j, "Saved ✓ " + (kind === "close" ? "closing" : "opening") + " reading · Na-save")) {
+            $("pumpReadForm").style.display = "none"; $("pumpReadMsg").innerHTML = ""; $("pumpPreview").style.display = "none"; }
+        });
+    };
+    if (id === "new") {
+      var d = state.detected || {};
+      api("/api/pump/save", { name: d.name, fuel_type: d.fuel || "Diesel", unit: "L", decimals: 0 }).then(function (j) {
+        if (j.error) { toast(j.error, 3500); return; } state.pump = j; go(j.pump.id); });
+    } else if (id) go(id);
+    else toast("Add a pump first · Magdagdag muna ng pump");
+  });
+  $("pumpList").addEventListener("click", function (e) {
+    var pid = e.target.dataset && e.target.dataset.save; if (!pid) return;
+    var card = e.target.closest(".pumpcard"), p = state.pump.check.pumps.filter(function (x) { return String(x.id) === pid; })[0];
+    var unit = card.querySelector('[data-f="unit"]').value, decimals = Number(card.querySelector('[data-f="decimals"]').value);
+    var open = card.querySelector('[data-k="open"]').value.trim(), close = card.querySelector('[data-k="close"]').value.trim();
+    var chain = Promise.resolve({}), changed = false, warnings = [];
+    var keep = function (j) { (j.warnings || []).forEach(function (w) { warnings.push(w); }); return j; };
+    if (unit !== p.unit || decimals !== p.decimals) { changed = true;
+      chain = chain.then(function () { return api("/api/pump/save", { id: p.id, name: p.name, fuel_type: p.fuel_type, unit: unit, decimals: decimals }); }); }
+    if (open && open !== (p.opening || "")) { changed = true;
+      chain = chain.then(function (j) { return j.error ? j : api("/api/pump/reading", { pump_id: p.id, kind: "open", reading: open }).then(keep); }); }
+    if (close && close !== (p.closing || "")) { changed = true;
+      chain = chain.then(function (j) { return j.error ? j : api("/api/pump/reading", { pump_id: p.id, kind: "close", reading: close }).then(keep); }); }
+    if (!changed) { toast("Nothing changed"); return; }
+    chain.then(function (j) { if (!j.error) j.warnings = warnings; afterPumpSave(j, "Saved ✓ " + p.name); });
+  });
+  $("addPumpBtn").addEventListener("click", function () {
+    api("/api/pump/save", { name: $("newPumpName").value, fuel_type: $("newPumpFuel").value, unit: $("newPumpUnit").value,
+      decimals: Number($("newPumpDec").value) }).then(function (j) {
+      if (afterPumpSave(j, "Pump added ✓")) { $("newPumpName").value = ""; $("addPumpBox").open = false; } });
+  });
+  $("pumpTolBtn").addEventListener("click", function () {
+    api("/api/pump/settings", { tolerance_pct: $("pumpTol").value }).then(function (j) { afterPumpSave(j, "Tolerance saved ✓"); });
+  });
+  $("pumpExplainBtn").addEventListener("click", function () {
+    busy(true, "Explaining on this computer… · Ipinapaliwanag…");
+    api("/api/pump/check", { lang: state.lang }).then(function (j) {
+      busy(false);
+      if (j.error) { toast(j.error, 3500); return; }
+      renderPump(j);
+      $("pumpExplain").innerHTML = '<div class="note ' + (j.check.flagged.length ? "err" : "info") + '"><small style="display:block;opacity:.8">' +
+        (j.explanation_source === "ai" ? "🤖 AI note (wording only; numbers computed by PumpLocal)" :
+          "Note (template" + (j.explanation_source === "template-fallback" ? ", local AI unavailable" : "") + ")") +
+        "</small>" + esc(j.explanation) + "</div>";
+    });
   });
 
   // ---------- ask
