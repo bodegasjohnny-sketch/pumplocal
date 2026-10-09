@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>JCB Shift Closing Slip (blank)</title>
+<!-- Printable blank slip for PumpLocal's "Scan closing slip" (Cash tab). Offline: no external fonts or files.
+     Designed for OCR: one column, big bold labels on the left, one amount per line on the right. -->
+<style>
+  @page { size: A5 portrait; margin: 10mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "DejaVu Sans", "Helvetica Neue", Arial, sans-serif; color: #000; background: #fff; }
+  .slip { width: 128mm; margin: 6mm auto; border: 0.8mm solid #000; padding: 6mm 7mm 4mm; }
+  h1 { font-size: 7.2mm; margin: 0; text-align: center; letter-spacing: .2mm; }
+  .sub { text-align: center; font-size: 3.4mm; color: #555; margin: 1.5mm 0 4mm; }
+  .row { display: flex; align-items: flex-end; height: 11.5mm; }
+  .label { font-weight: 800; font-size: 5.6mm; flex: 1; white-space: nowrap; }
+  .line { width: 52mm; border-bottom: 0.4mm solid #bbb; height: 9mm; }
+  .item .desc { flex: 1; margin-left: 4mm; margin-right: 6mm; border-bottom: 0.3mm solid #bbb; height: 9mm; }
+  .head .hint { font-size: 3.4mm; color: #666; font-weight: 400; }
+  .gap { height: 3.5mm; }
+  .foot { text-align: center; font-size: 3mm; color: #888; margin-top: 4mm; }
+  .print { text-align: center; margin: 4mm; font-size: 14px; }
+  @media print { .print { display: none; } .slip { margin: 0 auto; } }
+</style>
+</head>
+<body>
+<div class="print"><button onclick="window.print()">🖨 Print</button> · Write one amount per line, in pen, in big clear digits.</div>
+<div class="slip">
+  <h1>JCB SHIFT CLOSING SLIP</h1>
+  <div class="sub">One amount per line · Discounts = senior / PWD / suki total</div>
+  <div class="row"><span class="label">DATE</span><span class="line"></span></div>
+  <div class="row"><span class="label">SHIFT</span><span class="line"></span></div>
+  <div class="gap"></div>
+  <div class="row"><span class="label">OPENING FLOAT</span><span class="line"></span></div>
+  <div class="gap"></div>
+  <div class="row head"><span class="label">EXPENSES</span><span class="hint">item + amount</span></div>
+  <div class="row item"><span class="desc"></span><span class="line"></span></div>
+  <div class="row item"><span class="desc"></span><span class="line"></span></div>
+  <div class="row item"><span class="desc"></span><span class="line"></span></div>
+  <div class="gap"></div>
+  <div class="row"><span class="label">DISCOUNTS</span><span class="line"></span></div>
+  <div class="gap"></div>
+  <div class="row head"><span class="label">CREDIT / UTANG</span><span class="hint">name - fuel + amount</span></div>
+  <div class="row item"><span class="desc"></span><span class="line"></span></div>
+  <div class="row item"><span class="desc"></span><span class="line"></span></div>
+  <div class="gap"></div>
+  <div class="row"><span class="label">GCASH</span><span class="line"></span></div>
+  <div class="row"><span class="label">CARD</span><span class="line"></span></div>
+  <div class="gap"></div>
+  <div class="row"><span class="label">CASH COUNTED</span><span class="line"></span></div>
+  <div class="foot">PumpLocal · Scan in the Cash tab</div>
+</div>
+</body>
+</html>

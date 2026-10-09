@@ -82,6 +82,15 @@
   .chip { display:inline-block; padding:2px 8px; border-radius:6px; font-size:12px; font-weight:700; color:#fff; }
   .chip.Premium { background:var(--premium); } .chip.Unleaded { background:var(--unleaded); } .chip.Diesel { background:var(--diesel); color:#111; }
   .chip.other { background:#777; }
+  .slipbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:6px 0 4px; }
+  .slipbar .samples img { height:58px; }
+  #slipReview table input.txt, #slipReview table select.sel { font-size:15px; padding:6px 8px; }
+  #slipReview td { vertical-align:middle; padding-left:2px; padding-right:2px; }
+  #slipReview table input.txt, #slipReview table select.sel { width:100%; min-width:0; }
+  .st { font-size:12px; font-weight:700; border-radius:6px; padding:2px 7px; white-space:nowrap; }
+  .st.recorded { background:#dcf5ef; color:#11594f; } .st.new { background:#e7f0fb; color:#13315c; }
+  .st.invalid, .st.miss { background:#fde2e4; color:#8a1c25; }
+  .missing-field { border-color:var(--red) !important; background:#fff5f5 !important; }
   .x { border:0; background:none; color:#a33; font-size:13px; cursor:pointer; text-decoration:underline; }
   .result { border-radius:var(--radius); padding:18px; color:#fff; margin-top:14px; }
   .result.OK { background:var(--green); } .result.SHORT { background:var(--red); } .result.OVER { background:#d97706; }
@@ -280,6 +289,13 @@
       <div class="flex"><h2>Cash Check <span class="tl">· Bilang ng pera</span></h2>
         <span class="seg langseg" id="langSeg"><button data-l="en" class="on">EN</button><button data-l="tl">TL</button></span></div>
       <p class="hint">At shift end, count the cash drawer. PumpLocal computes the expected cash from saved sales and flags any difference.</p>
+      <div class="slipbar">
+        <label class="btn small navy" for="slipFile">📷 Scan closing slip · I-scan ang slip</label>
+        <input type="file" id="slipFile" accept="image/*" capture="environment">
+        <div class="samples" id="slipSamples"></div>
+        <a href="/closing-slip" target="_blank" style="font-size:13px">🖨 Print a blank slip</a>
+      </div>
+      <div id="slipReview"></div>
       <details id="countBox"><summary>🧮 Count the bills · Bilangin ang pera</summary>
         <div class="row4" style="margin-top:8px" id="denoms">
           <div><label class="f">₱1000 ×</label><input class="txt dn" data-d="1000" inputmode="numeric" placeholder="0" style="font-size:17px;padding:8px"></div>
@@ -446,6 +462,14 @@
             prepImage(bl, $("pumpPreview"), extractPump); });
         });
         $("pumpSamples").appendChild(b);
+      });
+      (j.slip_samples || []).forEach(function (name) {
+        var b = document.createElement("button"); b.title = name + " (synthetic slip)";
+        b.innerHTML = '<img alt="' + esc(name) + '" src="/samples/' + encodeURIComponent(name) + '">';
+        b.addEventListener("click", function () {
+          fetch("/samples/" + encodeURIComponent(name)).then(function (r) { return r.blob(); }).then(scanSlip);
+        });
+        $("slipSamples").appendChild(b);
       });
       (j.samples || []).forEach(function (name) {
         var b = document.createElement("button"); b.title = name;
@@ -665,6 +689,128 @@
         $("crCustomer").value = ""; $("crAmount").value = ""; loadCashExtras();
       });
   });
+
+  // ---------- closing slip (paper) -> Cash tab fields. Code reads and adds up; staff review, then confirm.
+  $("slipFile").addEventListener("change", function (e) { var f = e.target.files[0]; e.target.value = ""; if (f) scanSlip(f); });
+  function scanSlip(blob) {
+    prepImage(blob, { style: {} }, function (dataUrl, full) {
+      busy(true, "Reading the closing slip on this computer… · Binabasa ang slip…");
+      var body = { image: dataUrl }; if (full) body.image_full = full;
+      api("/api/slip/extract", body).then(function (j) {
+        busy(false);
+        state.slipRead = j;
+        if (j.ok) {
+          var sl = j.slip;
+          $("float").value = sl.opening_float || ""; $("noncash").value = sl.noncash || ""; $("declared").value = sl.cash_counted || "";
+          $("float").classList.toggle("missing-field", !sl.opening_float);
+          $("noncash").classList.toggle("missing-field", !sl.gcash && !sl.card);
+          $("declared").classList.toggle("missing-field", !sl.cash_counted);
+        }
+        renderSlip(j, j.compare);
+      });
+    });
+  }
+  function slipFromForm() {
+    var sl = JSON.parse(JSON.stringify(state.slipRead.slip));
+    sl.opening_float = $("float").value; sl.noncash = $("noncash").value; sl.cash_counted = $("declared").value;
+    sl.expenses = []; sl.credits = [];
+    document.querySelectorAll("#slipReview tr[data-exp]").forEach(function (tr) {
+      if (tr.querySelector("input[type=checkbox]") && !tr.querySelector("input[type=checkbox]").checked) return;
+      sl.expenses.push({ description: tr.querySelector("[data-k=description]").value, amount_pesos: tr.querySelector("[data-k=amount]").value });
+    });
+    document.querySelectorAll("#slipReview tr[data-cr]").forEach(function (tr) {
+      if (tr.querySelector("input[type=checkbox]") && !tr.querySelector("input[type=checkbox]").checked) return;
+      sl.credits.push({ customer: tr.querySelector("[data-k=customer]").value, fuel_type: tr.querySelector("[data-k=fuel]").value,
+        amount_pesos: tr.querySelector("[data-k=amount]").value });
+    });
+    return sl;
+  }
+  function stChip(it) {
+    if (it.status === "recorded") return '<span class="st recorded" title="Already saved: ' + esc(it.matched) + '">✓ saved</span>';
+    if (it.status === "invalid") return '<span class="st invalid">check amount</span>';
+    return '<span class="st new">＋ new</span>' + (it.same_amount_as ? '<br><small>same amount as ' + esc(it.same_amount_as) + "</small>" : "");
+  }
+  function box(it) { return it.status === "new" ? '<input type="checkbox" checked title="Save this item">' : ""; }
+  function renderSlip(j, c) {
+    var html = readerLine(j) + (j.fallback_reason ? '<div class="note warn">' + esc(j.fallback_reason) + "</div>" : "");
+    (j.warnings || []).forEach(function (w) { html += '<div class="note warn">' + esc(w) + "</div>"; });
+    if (!j.ok) { $("slipReview").innerHTML = html + '<div class="note err">⚠️ ' + esc(j.message || j.error) + "</div>"; return; }
+    var sl = j.slip;
+    html += '<div class="note info">' + esc(j.message) + "</div>";
+    var miss = (sl.missing_labels || []).map(function (m) { return '<span class="st miss">missing: ' + esc(m) + "</span>"; })
+      .concat((sl.unreadable_labels || []).map(function (m) { return '<span class="st miss">unreadable: ' + esc(m) + "</span>"; }));
+    if (miss.length) html += '<div style="margin:6px 0">' + miss.join(" ") + "</div>";
+    (sl.notes || []).forEach(function (n) { html += '<div class="note warn">' + esc(n) + "</div>"; });
+    html += '<table id="slipTable"><tr><td>Date / shift</td><td colspan="3">' + esc(sl.date || "—") + " · " + esc(sl.shift || "—") + "</td></tr>" +
+      "<tr><td>Opening float</td><td colspan='3' class='r'>" + peso(sl.opening_float) + " → form</td></tr>" +
+      "<tr><td>GCash + card</td><td colspan='3' class='r'>" + peso(sl.gcash) + " + " + peso(sl.card) + " = <b>" + peso(sl.noncash) + "</b> → form</td></tr>" +
+      "<tr><td>Cash counted</td><td colspan='3' class='r'><b>" + peso(sl.cash_counted) + "</b> → declared cash</td></tr>";
+    var d = c.discounts;
+    html += "<tr><td>Discounts</td><td colspan='3' class='r'>slip " + peso(d.slip) + " · saved on sales " + peso(d.recorded) +
+      (d.match === null ? "" : d.match ? ' <span class="st recorded">✓ match</span>' : ' <span class="st invalid">differs: add the discount on the sale</span>') + "</td></tr></table>";
+    html += '<h3 style="margin:12px 0 4px;font-size:15px">Expenses · Gastos</h3><table>';
+    c.expenses.forEach(function (e) {
+      html += '<tr data-exp="1"><td>' + box(e) + '</td><td style="min-width:120px"><input class="txt" data-k="description" value="' + esc(e.description) + '"></td>' +
+        '<td style="width:92px"><input class="txt" data-k="amount" inputmode="decimal" value="' + esc(e.amount_pesos || "") + '"></td><td>' + stChip(e) + "</td></tr>";
+    });
+    if (!c.expenses.length) html += '<tr><td colspan="4" class="hint">None on the slip.</td></tr>';
+    html += '</table><h3 style="margin:12px 0 4px;font-size:15px">Credit · Utang</h3><table>';
+    c.credits.forEach(function (cr) {
+      var opts = ["", "Diesel", "Premium", "Unleaded"].map(function (f) {
+        return '<option value="' + f + '"' + (f === (cr.fuel_type || "") ? " selected" : "") + ">" + (f || "Fuel?") + "</option>"; }).join("");
+      html += '<tr data-cr="1"><td>' + box(cr) + '</td><td style="min-width:110px"><input class="txt" data-k="customer" value="' + esc(cr.customer) + '"></td>' +
+        '<td style="width:86px"><select class="sel' + (cr.fuel_type ? "" : " missing-field") + '" data-k="fuel">' + opts + "</select></td>" +
+        '<td style="width:92px"><input class="txt" data-k="amount" inputmode="decimal" value="' + esc(cr.amount_pesos || "") + '"></td><td>' + stChip(cr) + "</td></tr>";
+    });
+    if (!c.credits.length) html += '<tr><td colspan="5" class="hint">None on the slip.</td></tr>';
+    html += "</table>";
+    if (c.preview) {
+      var p = c.preview;
+      html += '<div class="calc">Preview (code): expected cash <b>' + peso(p.expected) + "</b> · counted <b>" + peso(p.declared) + "</b> · " +
+        '<b class="' + p.status + '">' + p.status + " " + peso(p.diff) + (p.diff_pct ? " (" + p.diff_pct + "%)" : "") + "</b></div>";
+    }
+    html += '<div class="flex" style="justify-content:flex-start"><button class="btn small green" id="slipConfirm">✓ Confirm &amp; save · I-save</button>' +
+      '<button class="btn small ghost" id="slipCancel">Cancel</button></div><div id="slipMsg"></div>';
+    $("slipReview").innerHTML = '<div class="card" style="background:#f8fafc;margin-top:8px">' + html + "</div>";
+    $("slipReview").querySelectorAll("input,select").forEach(function (el) {
+      el.addEventListener("change", function () { if (el.dataset.k === "fuel") el.classList.toggle("missing-field", !el.value); refreshSlip(); }); });
+    $("slipCancel").addEventListener("click", function () { $("slipReview").innerHTML = ""; state.slipRead = null; });
+    $("slipConfirm").addEventListener("click", confirmSlip);
+  }
+  var slipTimer;
+  function refreshSlip() {
+    clearTimeout(slipTimer);
+    slipTimer = setTimeout(function () {
+      if (!state.slipRead) return;
+      var sl = slipFromForm();
+      api("/api/slip/compare", { slip: sl }).then(function (c) {
+        if (c.error) return;
+        var j = JSON.parse(JSON.stringify(state.slipRead)); j.slip.expenses = sl.expenses; j.slip.credits = sl.credits;
+        state.slipRead = j; renderSlip(j, c);
+      });
+    }, 300);
+  }
+  ["float", "noncash", "declared"].forEach(function (id) { $(id).addEventListener("input", function () {
+    $(id).classList.remove("missing-field"); if (state.slipRead && state.slipRead.ok) refreshSlip(); }); });
+  function confirmSlip() {
+    var sl = slipFromForm();
+    if (!sl.cash_counted) { toast("Enter the cash counted · Ilagay ang perang nabilang"); return; }
+    $("slipConfirm").disabled = true;
+    api("/api/slip/apply", { slip: sl }).then(function (r) {
+      $("slipConfirm").disabled = false;
+      if (r.error) { $("slipMsg").innerHTML = '<div class="note err">⚠️ ' + esc(r.error) + "</div>"; return; }
+      renderSync(r.sync); loadCashExtras();
+      if (r.errors && r.errors.length) {  // e.g. a credit line without a fuel: fix it and confirm again (saved items are not saved twice)
+        refreshSlip();
+        setTimeout(function () { $("slipMsg").innerHTML = '<div class="note err">⚠️ ' + esc(r.errors.join(" ")) + "</div>"; }, 700);
+        return;
+      }
+      var n = (r.saved_expenses || []).length + (r.saved_credits || []).length;
+      toast("Slip saved ✓ " + n + " new item" + (n === 1 ? "" : "s") + " · now checking cash", 3000);
+      $("slipReview").innerHTML = ""; state.slipRead = null;
+      $("cashBtn").click();
+    });
+  }
 
   $("cashBtn").addEventListener("click", function () {
     var counts = denomCounts();

@@ -15,6 +15,7 @@ import urllib.request
 
 import core
 import meterparse
+import slipparse
 import totalizer
 import vision
 
@@ -457,6 +458,79 @@ def read_expense(image, image_full=None):
     return res
 
 
+# ---------------------------------------------------------------- 1e) shift closing slip photo -> Cash tab fields
+SLIP_PROMPT = (
+    "This is a handwritten or printed shift closing slip. Copy its text exactly, one printed line per item, "
+    "keeping each label together with the amount written on the same line (for example \"OPENING FLOAT 1,000.00\"). "
+    'Reply with JSON only: {"lines": ["...", "..."]}. Copy only what is written. Do not add, total or compute '
+    "anything. Leave out lines you cannot read."
+)
+MOCK_SLIP = ('Here is the text:\n```json\n{"lines": ["JCB SHIFT CLOSING SLIP", "DATE 09 OCT 2026", "SHIFT 6AM - 2PM", '
+             '"OPENING FLOAT 1,000.00", "EXPENSES", "ICE AND WATER 150.00", "NOZZLE O-RING 350.00", "DISCOUNTS 50.00", '
+             '"CREDIT / UTANG", "MANG BEN - DIESEL 3,000.00", "GCASH 500.00", "CARD 300.00", '
+             '"CASH COUNTED 12,950.00"]}\n```')
+
+
+def _slip_result(p, raw, seconds, reader, source):
+    ok = p["is_slip"]
+    if not ok:
+        msg = ("This doesn't look like a shift closing slip. Snap the whole slip, flat and in good light. · "
+               "Mukhang hindi ito closing slip. Kunan ang buong slip nang maliwanag.")
+    elif p["missing"] or p["unreadable"]:
+        msg = "Read the slip. Some lines are missing or unreadable: please fill them in, check everything, then confirm."
+    else:
+        msg = "Read the slip. Check every value against the paper, then confirm."
+    return {"ok": ok, "slip": p, "raw": (raw or "")[:800], "message": msg, "seconds": round(seconds, 1),
+            "reader": reader, "source": source}
+
+
+def extract_slip(image_b64):
+    """Gemma fallback: Gemma only COPIES the slip's text; slipparse (code) finds the labels and amounts, so every
+    number in the result is one that appears in that transcription, and all totals are computed in code."""
+    if image_b64.startswith("data:") and "," in image_b64[:100]:
+        image_b64 = image_b64.split(",", 1)[1]
+    t0 = time.time()
+    raw = MOCK_SLIP if core.MOCK_AI else chat(
+        [{"role": "user", "content": SLIP_PROMPT, "images": [image_b64]}], json_mode=True, num_predict=400)
+    obj = parse_json_text(raw) or {}
+    lines = obj.get("lines") if isinstance(obj.get("lines"), list) else []
+    lines = [{"text": str(t)[:120]} for t in lines if isinstance(t, (str, int, float))][:60]
+    p = slipparse.parse(lines)
+    res = _slip_result(p, "\n".join(ln["text"] for ln in lines) or raw, time.time() - t0, "gemma", model_label())
+    if res["ok"]:
+        res["warnings"] = ["Read by the Gemma fallback (slower and less exact than OCR). Compare every amount with "
+                           "the paper before confirming."]
+    return res
+
+
+def read_slip(image, image_full=None):
+    """Closing slip photo -> structured values. Apple Vision OCR + slipparse (code) first. Gemma only if OCR is
+    unavailable or fails (not when OCR worked but the photo isn't a slip). The full-report guard of the Photo tab
+    is not used here: a slip is a summary sheet on purpose."""
+    reader = core.READER
+    fallback_reason = None
+    if reader in ("auto", "vision"):
+        t0 = time.time()
+        try:
+            data, suffix = _decode_image(image_full or image)
+            lines = vision.run_image_bytes(data, suffix)
+            p = slipparse.parse(lines)
+            return _slip_result(p, "\n".join(p["rows"]), time.time() - t0, "vision", VISION_SOURCE)
+        except vision.OCRError as e:
+            if reader == "vision":
+                res = _slip_result(slipparse.parse([]), "", time.time() - t0, "vision", VISION_SOURCE)
+                res["message"] = "Apple Vision OCR could not read the photo (%s). Please type the values." % e
+                return res
+            if vision.status()["available"]:
+                fallback_reason = "Apple Vision OCR failed (%s), so Gemma read it instead." % e
+        except (ValueError, TypeError) as e:
+            fallback_reason = "Could not decode the image for OCR (%s)." % e
+    res = extract_slip(image)
+    if fallback_reason:
+        res["fallback_reason"] = fallback_reason
+    return res
+
+
 # ---------------------------------------------------------------- 1d) pump vs sales wording
 def template_pump_text(check, lang="en"):
     """Short wording for the pump check. All numbers come from core.pump_check."""
@@ -719,6 +793,29 @@ def unverified_numbers(answer, context):
     return bad
 
 
+CANT_ANSWER = re.compile(
+    r"hindi\s+(?:ko\s+)?masa(?:sagot|got)|hindi\s+(?:sapat|eksakto|tiyak)|walang\s+sapat|kulang\s+ang\s+datos|"
+    r"can(?:not|'t|’t)\s+(?:be\s+)?(?:answer|determin|tell)|unable\s+to\s+(?:answer|determin)|not\s+enough\s+"
+    r"(?:data|information)|(?:data|information)\s+(?:does\s+not|doesn't|doesn’t)\s+(?:fully\s+|exactly\s+)?"
+    r"(?:answer|show|say|include)|not\s+(?:possible|able)\s+to\s+answer|cannot\s+answer\s+exactly", re.I)
+
+
+def strip_cant_answer(answer, context):
+    """Gemma sometimes answers correctly and then adds 'Hindi masasagot ng datos ang tanong nang eksakto.'
+    If the answer already uses a number from DATA, drop such trailing 'can't answer' sentences. If no DATA
+    number is used, keep everything (then the 'can't answer' may be true)."""
+    allowed = _norm_numbers(context)
+    used = [m for m in re.findall(r"\d[\d,]*(?:\.\d+)?", answer or "")
+            if core.Decimal(m.replace(",", "")).normalize() in allowed and core.Decimal(m.replace(",", "")) > 3]
+    if not used:
+        return answer
+    parts = re.split(r"(?<=[.!?])\s+", (answer or "").strip())
+    kept = list(parts)
+    while len(kept) > 1 and CANT_ANSWER.search(kept[-1]):
+        kept.pop()
+    return " ".join(kept)
+
+
 def ask(question, s):
     lang = detect_lang(question)
     context = summary_context(s)
@@ -727,12 +824,18 @@ def ask(question, s):
     else:
         language = "Tagalog" if lang == "tl" else "English"
         prompt = ("You help staff at a small Philippine gas station. DATA (computed by the system, trust it):\n"
-                  "%s\n\nQUESTION: %s\n\nAnswer in %s in 1-3 short sentences using ONLY numbers from DATA. "
-                  "Do not calculate new numbers. For questions about missing or unrecorded fuel (e.g. 'may kulang ba sa "
-                  "diesel?'), use the Pump meters lines. If DATA does not have the answer, say so." % (
-                      context, question, language))
+                  "%s\n\nQUESTION: %s\n\nRULES:\n"
+                  "- Answer in %s in 1-2 short sentences.\n"
+                  "- Use only numbers that appear in DATA. Do not calculate new numbers.\n"
+                  "- For questions about missing or unrecorded fuel (e.g. 'may kulang ba sa diesel?'), use the Pump "
+                  "meters lines.\n"
+                  "- If DATA answers the question, just answer it. Do not add disclaimers, caveats or notes about the "
+                  "data.\n"
+                  "- Only if the number needed is truly missing from DATA, say in one sentence that the data doesn't "
+                  "have it." % (context, question, language))
         try:
-            answer, source = chat([{"role": "user", "content": prompt}], num_predict=150).strip(), "ai"
+            answer, source = chat([{"role": "user", "content": prompt}], num_predict=120).strip(), "ai"
+            answer = strip_cant_answer(answer, context)
         except AIError as e:
             answer = template_answer(question, s, lang)
             source = "template-fallback"

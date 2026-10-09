@@ -81,6 +81,8 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         if path in ("/", "/index.html"):
             return self.send_file(os.path.join(STATIC, "index.html"))
+        if path in ("/closing-slip", "/closing_slip_template.html"):
+            return self.send_file(os.path.join(STATIC, "closing_slip_template.html"))
         if path in ("/slides", "/slides/", "/slides.html"):
             return self.send_file(os.path.join(STATIC, "slides.html"))
         if path.startswith("/samples/"):
@@ -89,11 +91,13 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/samples":
             files = sorted(f for f in os.listdir(SAMPLES) if f.lower().endswith((".png", ".jpg")))
             pump = [f for f in files if "totalizer" in f.lower()]
+            slip = [f for f in files if f.lower().startswith("closing_slip")]
             other = [f for f in files if f.lower().startswith(("closing_sheet", "handwritten"))]
             # "samples" = sale photos (Photo tab); "pump_samples" = totalizer photos (Pump tab);
             # "other_samples" = e.g. the closing-sheet form images (not a single sale)
-            return self.send_json({"samples": [f for f in files if f not in pump and f not in other],
-                                   "pump_samples": pump, "other_samples": other})
+            return self.send_json({"samples": [f for f in files if f not in pump + other + slip],
+                                   "pump_samples": pump, "other_samples": other,
+                                   "slip_samples": sorted(slip, key=lambda f: not f.endswith(".jpg"))})
         if path == "/api/status":
             return self.send_json(status_payload())
         if path == "/api/shift":
@@ -178,6 +182,24 @@ class Handler(BaseHTTPRequestHandler):
                 except ai.AIError as e:
                     return self.send_json({"ok": False, "error": str(e), "amount_pesos": None, "reader": "gemma",
                                            "message": "Local AI unavailable. Please type the amount."}, 503)
+            if path == "/api/slip/extract":
+                img = data.get("image") or ""
+                if len(img) < 100:
+                    return self.send_json({"error": "No image received."}, 400)
+                try:
+                    res = ai.read_slip(img, data.get("image_full") or None)
+                except ai.AIError as e:
+                    return self.send_json({"ok": False, "error": str(e), "reader": "gemma",
+                                           "message": "Local AI unavailable. Please type the values."}, 503)
+                res["compare"] = core.slip_compare(res["slip"]) if res.get("ok") else None
+                return self.send_json(res)
+            if path == "/api/slip/compare":
+                return self.send_json(core.slip_compare(data.get("slip") or {}))
+            if path == "/api/slip/apply":
+                out = core.slip_apply(data.get("slip") or {})
+                out["sync"] = sync.status()
+                return self.send_json(out, 400 if out["errors"] and not (out["saved_expenses"] or out["saved_credits"])
+                                      else 200)
             if path == "/api/credit":
                 rec, errors, calc = core.save_sale(dict(data, payment="credit"))
                 if errors:

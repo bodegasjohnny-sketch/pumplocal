@@ -905,3 +905,89 @@ def save_expense(data, shift_id=None, created_at=None):
 
 def void_expense(expense_id):
     execute("UPDATE expenses SET voided=1, synced=0 WHERE id=?", (int(expense_id),))
+
+
+# ---------------------------------------------------------------- shift closing slip (paper) vs this shift
+def _name_tokens(name):
+    return {t for t in re.findall(r"[a-z0-9]+", (name or "").lower()) if len(t) >= 2}
+
+
+def slip_compare(slip, shift_id=None):
+    """Compare a read slip (slipparse.parse result, possibly edited by staff) with what this shift already has.
+
+    Expenses: a slip item with the same amount as an unmatched recorded expense is 'recorded', else 'new'.
+    Credit: same amount and a shared name word ('Mang Ben' ~ 'Mang Ben (trucking)') is 'recorded', else 'new'.
+    Discounts can only be entered per sale, so the slip total is compared with the recorded total.
+    The preview is the cash check as it would be after saving the new items. Pure code."""
+    s = shift_summary(shift_id)
+    free_exp = [dict(e) for e in s["expenses"]]
+    expenses = []
+    for item in slip.get("expenses") or []:
+        amt = dec(item.get("amount_pesos"))
+        e = dict(item, amount_pesos=str(q2(amt)) if amt is not None else None, status="new", matched=None)
+        if amt is None or amt <= 0:
+            e["status"] = "invalid"
+        else:
+            hit = next((r for r in free_exp if Decimal(r["amount_pesos"]) == q2(amt)), None)
+            if hit:
+                free_exp.remove(hit)
+                e.update(status="recorded", matched=hit["description"])
+        expenses.append(e)
+    free_cr = [dict(c) for c in s["credit_sales"]]
+    credits = []
+    for item in slip.get("credits") or []:
+        amt = dec(item.get("amount_pesos"))
+        c = dict(item, amount_pesos=str(q2(amt)) if amt is not None else None, status="new", matched=None,
+                 same_amount_as=None)
+        if amt is None or amt <= 0:
+            c["status"] = "invalid"
+        else:
+            same = [r for r in free_cr if Decimal(r["amount"]) == q2(amt)]
+            hit = next((r for r in same if _name_tokens(r["customer"]) & _name_tokens(item.get("customer"))), None)
+            if hit:
+                free_cr.remove(hit)
+                c.update(status="recorded", matched=hit["customer"])
+            elif same:
+                c["same_amount_as"] = same[0]["customer"]
+        credits.append(c)
+    new_exp = sum((Decimal(e["amount_pesos"]) for e in expenses if e["status"] == "new"), Decimal(0))
+    new_cr = sum((Decimal(c["amount_pesos"]) for c in credits if c["status"] == "new"), Decimal(0))
+    slip_disc = dec(slip.get("discounts"))
+    rec_disc = Decimal(s["discounts_total"])
+    discounts = {"slip": str(q2(slip_disc)) if slip_disc is not None else None, "recorded": str(q2(rec_disc)),
+                 "match": None if slip_disc is None else q2(slip_disc) == rec_disc}
+    noncash = dec(slip.get("noncash"))
+    if noncash is None and (slip.get("gcash") or slip.get("card")):
+        noncash = (dec(slip.get("gcash")) or Decimal(0)) + (dec(slip.get("card")) or Decimal(0))
+    preview = None
+    if dec(slip.get("cash_counted")) is not None:
+        # A new credit sale adds to gross sales AND to credit, so it doesn't change expected cash.
+        preview = compute_cash(Decimal(s["total_amount"]) + new_cr, slip.get("cash_counted"),
+                               slip.get("opening_float"), noncash, discounts=rec_disc,
+                               credit=Decimal(s["credit_total"]) + new_cr,
+                               expenses=Decimal(s["expenses_total"]) + new_exp)
+    return {"expenses": expenses, "credits": credits, "discounts": discounts,
+            "noncash": str(q2(noncash)) if noncash is not None else None, "preview": preview,
+            "new_expenses_total": str(q2(new_exp)), "new_credit_total": str(q2(new_cr))}
+
+
+def slip_apply(slip, shift_id=None):
+    """Save the slip's NEW expenses and credit sales (items already recorded are skipped, so pressing confirm
+    twice adds nothing). Returns {"saved_expenses", "saved_credits", "skipped", "errors"}."""
+    cmp_ = slip_compare(slip, shift_id)
+    saved_e, saved_c, skipped, errors = [], [], [], []
+    for e in cmp_["expenses"]:
+        if e["status"] != "new":
+            skipped.append("%s %s (%s)" % (e.get("description") or "Expense", peso(e["amount_pesos"] or 0), e["status"]))
+            continue
+        rec, errs = save_expense({"amount_pesos": e["amount_pesos"], "description": e.get("description") or "Expense",
+                                  "source": "photo"}, shift_id=shift_id)
+        (errors.extend(errs) if errs else saved_e.append(rec))
+    for c in cmp_["credits"]:
+        if c["status"] != "new":
+            skipped.append("%s %s (%s)" % (c.get("customer") or "Credit", peso(c["amount_pesos"] or 0), c["status"]))
+            continue
+        rec, errs, _ = save_sale({"payment": "credit", "customer": c.get("customer"), "fuel_type": c.get("fuel_type"),
+                                  "amount_pesos": c["amount_pesos"], "source": "photo"}, shift_id=shift_id)
+        (errors.extend(["%s: %s" % (c.get("customer") or "Credit", m) for m in errs]) if errs else saved_c.append(rec))
+    return {"saved_expenses": saved_e, "saved_credits": saved_c, "skipped": skipped, "errors": errors}
