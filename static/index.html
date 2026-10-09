@@ -751,7 +751,9 @@
       "<tr><td>Cash counted</td><td colspan='3' class='r'><b>" + peso(sl.cash_counted) + "</b> → declared cash</td></tr>";
     var d = c.discounts;
     html += "<tr><td>Discounts</td><td colspan='3' class='r'>slip " + peso(d.slip) + " · saved on sales " + peso(d.recorded) +
-      (d.match === null ? "" : d.match ? ' <span class="st recorded">✓ match</span>' : ' <span class="st invalid">differs: add the discount on the sale</span>') + "</td></tr></table>";
+      (d.match === null ? "" : d.match ? ' <span class="st recorded">✓ match</span>' :
+        Number(d.from_slip) > 0 ? ' <span class="st new">＋ ' + peso(d.from_slip) + " from the slip will be counted</span>" :
+        ' <span class="st invalid">sales have more: ' + peso(d.after) + " counted, check the slip</span>") + "</td></tr></table>";
     html += '<h3 style="margin:12px 0 4px;font-size:15px">Expenses · Gastos</h3><table>';
     c.expenses.forEach(function (e) {
       html += '<tr data-exp="1"><td>' + box(e) + '</td><td style="min-width:120px"><input class="txt" data-k="description" value="' + esc(e.description) + '"></td>' +
@@ -1070,7 +1072,7 @@
     var pending = addMsg("a", '<span class="spinner" style="display:inline-block;width:18px;height:18px;border-width:3px;vertical-align:middle"></span> Thinking locally… · Nag-iisip…');
     api("/api/ask", { question: q }).then(function (j) {
       if (j.error) { pending.innerHTML = "⚠️ " + esc(j.error); return; }
-      var src = { ai: "🤖 Local AI (" + state.model + ") · numbers from PumpLocal", template: "Template answer (mock mode)",
+      var src = { ai: "🤖 Local AI (" + state.model + ") · numbers from PumpLocal", template: "Template answer (mock mode)", code: "🧮 Computed by PumpLocal (code, exact numbers)",
         "template-fallback": "Local AI unavailable · answered directly from the totals" }[j.source] || j.source;
       var html = esc(j.answer);
       if (j.unverified_numbers && j.unverified_numbers.length)

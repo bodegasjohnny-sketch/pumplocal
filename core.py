@@ -456,8 +456,14 @@ def shift_summary(shift_id=None):
                                 "liters": s["liters"], "amount": str(q2(net)), "created_at": s["created_at"]})
     expenses = rows("SELECT * FROM expenses WHERE shift_id=? AND voided=0 ORDER BY id", (shift["id"],))
     exp_total = sum((Decimal(e["amount_pesos"]) for e in expenses), Decimal(0))
+    # The closing slip's discount total (saved on Confirm) counts when it is MORE than the discounts typed on sales:
+    # the shift's discount is the larger of the two, never the sum, so a discount on both is not counted twice.
+    slip_disc = dec(get_setting(_slip_disc_key(shift["id"])))
+    from_slip = max(Decimal(0), q2(slip_disc) - discounts) if slip_disc is not None else Decimal(0)
     return {
-        "discounts_total": str(q2(discounts)),
+        "discounts_total": str(q2(discounts + from_slip)),
+        "discounts_on_sales": str(q2(discounts)),
+        "discounts_from_slip": str(q2(from_slip)),
         "discounts_by_reason": {k: str(q2(v)) for k, v in sorted(disc_by_reason.items())},
         "discount_count": sum(1 for s in sales if Decimal(s.get("discount_pesos") or "0")),
         "credit_total": str(q2(credit)), "credit_sales": credit_list,
@@ -468,6 +474,10 @@ def shift_summary(shift_id=None):
         "pump_check": pump_check(shift["id"]),
         "opening_float_preset": get_setting("opening_float:%s" % shift["id"]),
     }
+
+
+def _slip_disc_key(shift_id):
+    return "slip_discounts:%s" % shift_id
 
 
 def save_cash_check(result, explanation, source, shift_id, cash_count=""):
@@ -919,7 +929,8 @@ def slip_compare(slip, shift_id=None):
 
     Expenses: a slip item with the same amount as an unmatched recorded expense is 'recorded', else 'new'.
     Credit: same amount and a shared name word ('Mang Ben' ~ 'Mang Ben (trucking)') is 'recorded', else 'new'.
-    Discounts can only be entered per sale, so the slip total is compared with the recorded total.
+    Discounts: the slip's total is compared with the discounts typed on sales. On Confirm it is saved for the shift,
+    and the shift counts the LARGER of the two (never both), see shift_summary.
     The preview is the cash check as it would be after saving the new items. Pure code."""
     s = shift_summary(shift_id)
     free_exp = [dict(e) for e in s["expenses"]]
@@ -955,9 +966,13 @@ def slip_compare(slip, shift_id=None):
     new_exp = sum((Decimal(e["amount_pesos"]) for e in expenses if e["status"] == "new"), Decimal(0))
     new_cr = sum((Decimal(c["amount_pesos"]) for c in credits if c["status"] == "new"), Decimal(0))
     slip_disc = dec(slip.get("discounts"))
-    rec_disc = Decimal(s["discounts_total"])
+    if slip_disc is not None and slip_disc < 0:
+        slip_disc = None
+    rec_disc = Decimal(s["discounts_on_sales"])
+    after_disc = max(rec_disc, q2(slip_disc)) if slip_disc is not None else Decimal(s["discounts_total"])
     discounts = {"slip": str(q2(slip_disc)) if slip_disc is not None else None, "recorded": str(q2(rec_disc)),
-                 "match": None if slip_disc is None else q2(slip_disc) == rec_disc}
+                 "match": None if slip_disc is None else q2(slip_disc) == rec_disc,
+                 "from_slip": str(q2(max(Decimal(0), after_disc - rec_disc))), "after": str(q2(after_disc))}
     noncash = dec(slip.get("noncash"))
     if noncash is None and (slip.get("gcash") or slip.get("card")):
         noncash = (dec(slip.get("gcash")) or Decimal(0)) + (dec(slip.get("card")) or Decimal(0))
@@ -965,7 +980,7 @@ def slip_compare(slip, shift_id=None):
     if dec(slip.get("cash_counted")) is not None:
         # A new credit sale adds to gross sales AND to credit, so it doesn't change expected cash.
         preview = compute_cash(Decimal(s["total_amount"]) + new_cr, slip.get("cash_counted"),
-                               slip.get("opening_float"), noncash, discounts=rec_disc,
+                               slip.get("opening_float"), noncash, discounts=after_disc,
                                credit=Decimal(s["credit_total"]) + new_cr,
                                expenses=Decimal(s["expenses_total"]) + new_exp)
     return {"expenses": expenses, "credits": credits, "discounts": discounts,
@@ -992,4 +1007,11 @@ def slip_apply(slip, shift_id=None):
         rec, errs, _ = save_sale({"payment": "credit", "customer": c.get("customer"), "fuel_type": c.get("fuel_type"),
                                   "amount_pesos": c["amount_pesos"], "source": "photo"}, shift_id=shift_id)
         (errors.extend(["%s: %s" % (c.get("customer") or "Credit", m) for m in errs]) if errs else saved_c.append(rec))
-    return {"saved_expenses": saved_e, "saved_credits": saved_c, "skipped": skipped, "errors": errors}
+    slip_disc = dec(slip.get("discounts"))
+    saved_d = None
+    if slip_disc is not None and slip_disc >= 0:
+        sid = shift_id or current_shift()["id"]
+        set_setting(_slip_disc_key(sid), str(q2(slip_disc)))  # replaces, never adds: confirming twice is safe
+        saved_d = cmp_["discounts"]["from_slip"]
+    return {"saved_expenses": saved_e, "saved_credits": saved_c, "skipped": skipped, "errors": errors,
+            "discount_from_slip": saved_d}

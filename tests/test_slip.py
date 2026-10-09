@@ -127,7 +127,8 @@ class SlipShiftTests(unittest.TestCase):
         c = core.slip_compare(self.slip)
         self.assertEqual([e["status"] for e in c["expenses"]], ["new", "new"])
         self.assertEqual([(x["customer"], x["status"]) for x in c["credits"]], [("Mang Ben", "new")])
-        self.assertEqual(c["discounts"], {"slip": "20.00", "recorded": "20.00", "match": True})
+        self.assertEqual(c["discounts"], {"slip": "20.00", "recorded": "20.00", "match": True, "from_slip": "0.00",
+                                         "after": "20.00"})
         p = c["preview"]
         self.assertEqual((p["expected"], p["declared"], p["diff"], p["status"]), ("3313.20", "3263.20", "-50.00", "SHORT"))
 
@@ -141,9 +142,30 @@ class SlipShiftTests(unittest.TestCase):
         self.assertEqual(after["total_amount"], "4488.20")  # the credit sale is a diesel sale at the posted price
         again = core.slip_apply(self.slip)  # confirm pressed twice: nothing new
         self.assertEqual((again["saved_expenses"], again["saved_credits"], len(again["skipped"])), ([], [], 3))
+        self.assertEqual(after["discounts_total"], "20.00")  # typed on the sale AND on the slip: counted once
         recheck = core.slip_compare(self.slip)
         self.assertEqual([x["status"] for x in recheck["credits"]], ["recorded"])
         self.assertEqual(recheck["preview"]["diff"], "-50.00")
+
+    def test_slip_discount_applies_when_not_typed_on_a_sale_and_never_twice(self):
+        # Johnny's live run: the Premium sample was saved without the P20 discount; only the slip has it.
+        prem = core.rows("SELECT id FROM sales WHERE fuel_type='Premium'")[0]["id"]
+        core.execute("UPDATE sales SET discount_pesos='0', discount_reason='' WHERE id=?", (prem,))
+        c = core.slip_compare(self.slip)
+        self.assertEqual((c["discounts"]["match"], c["discounts"]["from_slip"]), (False, "20.00"))
+        self.assertEqual((c["preview"]["expected"], c["preview"]["diff"]), ("3313.20", "-50.00"))
+        self.assertEqual(core.slip_apply(self.slip)["discount_from_slip"], "20.00")
+        self.assertEqual(core.slip_apply(self.slip)["discount_from_slip"], "20.00")  # confirm twice: still P20
+        s = core.shift_summary()
+        self.assertEqual((s["discounts_total"], s["discounts_on_sales"], s["discounts_from_slip"]),
+                         ("20.00", "0.00", "20.00"))
+        r = core.compute_cash(s["total_amount"], "3263.20", "1000", "800", discounts=s["discounts_total"],
+                              credit=s["credit_total"], expenses=s["expenses_total"])
+        self.assertEqual((r["expected"], r["diff"], r["status"]), ("3313.20", "-50.00", "SHORT"))
+        # staff types the P20 on the sale afterwards: still P20 in total, not P40
+        core.execute("UPDATE sales SET discount_pesos='20.00', discount_reason='senior' WHERE id=?", (prem,))
+        s = core.shift_summary()
+        self.assertEqual((s["discounts_total"], s["discounts_from_slip"]), ("20.00", "0.00"))
 
     def test_credit_without_fuel_is_an_error_not_a_guess(self):
         slip = dict(self.slip, expenses=[], credits=[{"customer": "Aling Nena", "fuel_type": "", "amount_pesos": "500"}])
