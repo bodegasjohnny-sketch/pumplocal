@@ -39,6 +39,15 @@ Plain-English notes on how PumpLocal really works, taken from the code in this r
 
 **Expense receipts:** `/api/expense/extract` → **`ai.read_expense`** → **`meterparse.receipt_total`**. It finds the TOTAL line and ignores SUBTOTAL, CASH, CHANGE and VAT lines.
 
+**Shift Closing Slip:** Cash tab → "Scan closing slip" → `/api/slip/extract` → **`ai.read_slip`** → `vision.run_image_bytes` → **`slipparse.parse`**.
+- `rows_from_lines` joins the pieces of each row (OCR splits labels and amounts, and phone photos are tilted). Each row is matched to a printed label (OPENING FLOAT, EXPENSES, DISCOUNTS, CREDIT / UTANG, GCASH, CARD, CASH COUNTED); amounts are parsed in code. Anything missing or unreadable is listed and highlighted, never guessed. The slip is far below the report guard's limits, so the guard doesn't block it.
+- **`core.slip_compare`** marks each expense/credit "✓ saved" (same amount already recorded; credit also needs a shared name word) or "＋ new", checks the discount total against the discounts typed on sales, and previews the expected cash. **`core.slip_apply`** (Confirm) saves only the new items, so pressing it twice saves nothing more; then the normal cash check runs.
+- Gemma is used only if OCR fails, and only to **transcribe** the lines as JSON; the same code parses them.
+
+**Ask answers:** the prompt asks for 1–2 sentences in the user's language, using only the DATA numbers, no disclaimers, and "can't answer" only when the number is truly missing. **`ai.strip_cant_answer`** removes a trailing "Hindi masasagot…"/"can't answer" sentence when the answer already uses a DATA number (seen in my test, after a correct answer).
+
+**Demo Day:** `python3 seed.py --demo-empty`, then follow [DEMO_SCRIPT.md](DEMO_SCRIPT.md). `tests/test_demo_script.py` replays that click order and checks every number in the script.
+
 ## 2. How the Gemma fallback works
 
 - **When it's used:** only if OCR is unavailable (not a Mac, no Xcode tools), OCR fails or times out, or OCR's numbers don't add up. For totalizers, also when no labelled number was found.
@@ -132,7 +141,7 @@ percent       = difference ÷ expected × 100
    Grok Bot, an AI coding assistant, wrote essentially all of it from my direction. I supplied the station's real problems and photos, tested on my Mac, and made the decisions. Devin was tried but had no credits left, so it wrote nothing. Claude only helped clean up my Mac. All of this is in `BUILD_LOG.md`.
 
 10. **"How do you know it works?"**
-    There are 110 automated tests (`MOCK_AI=1 python3 -m unittest discover -s tests`). They start the real server, call every endpoint, and test the parsers, the math, sync (with a fake server), a fake Ollama, and Ollama being down. **Caveat:** the tests run on Linux, so Apple Vision itself is replaced by a stand-in that returns recorded OCR text. The real Vision path has only been tried by hand on my Mac.
+    There are 131 automated tests (`MOCK_AI=1 python3 -m unittest discover -s tests`). They start the real server, call every endpoint, and test the parsers, the math, sync (with a fake server), a fake Ollama, and Ollama being down. **Caveat:** the tests run on Linux, so Apple Vision itself is replaced by a stand-in that returns recorded OCR text. The real Vision path has only been tried by hand on my Mac.
 
 ### If they push further
 

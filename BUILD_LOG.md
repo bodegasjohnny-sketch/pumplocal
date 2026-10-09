@@ -66,18 +66,21 @@ Times are git commit times converted to PHT (UTC+8), from `git log`. Several com
 | 4:02 PM | **Pump readings sync:** pumps and totalizer readings join the offline sync queue the same way expenses do (built by Grok Bot after Devin had no credits) | `b46cef4` | 102 |
 | 4:30 PM | **Slides:** added "How it runs at the station" (staff phones, Wi-Fi router, used Mac mini, UPS) | `17cfb66` | 102 |
 | 4:41 PM | **Bug fix from my test:** a photo of the full closing sheet produced a fake sale (1.000 L, ₱80.35, ₱79.85). The Photo tab now recognizes a whole report or sheet and asks for one pump display or one receipt, without guessing and without falling back to Gemma | `c9ca7ca` | 110 |
+| 4:49 PM | **Shift Closing Slip:** printable one-page slip (`/closing-slip`), synthetic filled samples, `slipparse.py` (code reads every line), Cash tab "Scan closing slip" → review (new vs already saved, discount check, missing values highlighted) → confirm saves only new items and runs the cash check. Gemma only if OCR fails, and only to transcribe | `f5e5fa7` | 124 |
+| 4:49 PM | **Ask fix from my test:** a correct answer was followed by "Hindi masasagot ng datos ang tanong nang eksakto." The prompt now asks for 1–2 sentences, no disclaimers, and "can't answer" only when the number is truly missing; code drops a trailing can't-answer sentence after a real answer | `1cc152e` | 129 |
+| 5:00 PM | **Demo Day flow:** `seed.py --demo-empty` (empty shift, float, prices and the real 775397 opening preset), two synthetic Diesel 2 closing totalizer screens, slip numbers aligned to the demo, [DEMO_SCRIPT.md](DEMO_SCRIPT.md) (full + 3-minute stage version) and an end-to-end test of that exact click order | see git log | 131 |
 
 ## Key design decisions
 
 - **Math is done by code, never by AI.** Liters, totals, dispensed fuel, gaps, percentages and expected cash are all computed in Python with `Decimal`.
 - **AI only reads photos and writes explanations.** The model's wording is labeled as AI, and there's a template fallback. Ask answers are checked against the computed numbers.
-- **I deliberately did not OCR the handwritten closing sheet.** Handwriting is unreliable to read, and the point of the app is to replace that sheet with readings from the pump itself.
+- **I deliberately did not OCR the handwritten closing sheet.** Handwriting is unreliable to read, and the point of the app is to replace that sheet with readings from the pump itself. The Shift Closing Slip is a different, printed form with one amount per line; its samples use typed digits, and real handwriting hasn't been tested.
 - **A price mismatch is a warning, not a theft flag.** If pesos ÷ liters doesn't match the posted price, it usually means a misread or a mid-shift price change. Only a fuel gap over the tolerance turns the card red.
 
 ## Assets
 
 - **Made before kickoff:** the real photo of a pump totalizer screen at my station (`samples/real_totalizer_diesel2.png`). Only its peso reading (775397) is real; the other pump readings in the demo are made up. If I show a photo of a handwritten closing sheet on a slide, it was also taken before kickoff and is blurred. It is **not** in the repo; the slide falls back to a drawn placeholder.
-- **Generated during the hackathon:** all other sample images, which are synthetic: the meter and receipt samples and `samples/closing_sheet_*`.
+- **Generated during the hackathon:** all other sample images, which are synthetic: the meter and receipt samples, `samples/closing_sheet_*`, the closing slip (`samples/closing_slip_*`) and the two Diesel 2 closing totalizer screens (`samples/synthetic_totalizer_diesel2_close_*`, made-up closings that fit the real opening).
 - **Code:** none existed before kickoff.
 
 ## Privacy

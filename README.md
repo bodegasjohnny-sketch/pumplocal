@@ -40,10 +40,11 @@ Built for **AppBuildersPH Hackathon 2026**, theme: **Local AI**.
    - **Discounts:** the sale form has an optional peso discount with a reason (suki, senior, PWD or other). The liters stay as pumped, and the customer pays the amount minus the discount.
    - **Credit (utang):** a sale to a named customer counts as a sale and as fuel dispensed, but not as drawer cash.
    - **Expenses / petty cash:** typed in, or read from a receipt photo. Code finds the TOTAL line, using the same OCR-first pipeline with Gemma as fallback. Expenses can be voided.
+   - **Shift Closing Slip (Scan closing slip):** the attendant fills in a printed one-page slip ([`/closing-slip`](static/closing_slip_template.html), "Print a blank slip" link in the Cash tab): opening float, one expense per line, the discounts total, one credit per line ("MANG BEN - DIESEL 1,000.00"), GCash, card and cash counted. A photo of it is read by Apple Vision OCR; **code** (`slipparse.py`) joins the tilted pieces of each row, matches the printed labels and parses the amounts. The review table shows every value it read, marks anything missing or unreadable in yellow (never guessed), and compares the slip with the shift: an expense or credit already recorded with the same amount shows "✓ saved", anything else "＋ new", and the slip's discounts total is checked against the discounts typed on sales. A live preview shows the expected cash in code. **Confirm** saves only the new items (pressing it twice saves nothing more), fills the float, GCash/card and declared cash, and runs the cash check. Gemma is used only if OCR fails, and then only to transcribe the lines; the same code parses them, so a number Gemma didn't write can't appear. Samples: `closing_slip_photo.jpg` (tilted, shadowed phone photo) and `closing_slip_clean.png`, both synthetic.
    - **Bill count:** staff enter how many ₱1000, ₱500, ₱200, ₱100, ₱50 and ₱20 bills they have, plus coins. Code adds them up, and the total fills in the declared cash.
 
-   The AI only writes a 1–2 sentence explanation, which is labeled as AI wording. The pump-vs-sales gap for each fuel is shown in the same summary. Discounts, credit and expenses are part of the Ask data too, for questions like *"Magkano ang utang ngayon?"*. The AI only writes a 1–2 sentence explanation, which is labeled as AI wording. The pump-vs-sales gap for each fuel is shown in the same summary.
-4. **Ask: Magtanong.** Staff type questions like *"Magkano ang benta ng diesel ngayon?"* or *"May kulang ba sa diesel?"* Code computes the shift totals and gives them to the model as its only data. The model answers in the same language. If the answer contains a number that isn't in the computed data, PumpLocal shows a warning.
+   The AI only writes a 1–2 sentence explanation, which is labeled as AI wording. The pump-vs-sales gap for each fuel is shown in the same summary. Discounts, credit and expenses are part of the Ask data too, for questions like *"Magkano ang utang ngayon?"*.
+4. **Ask: Magtanong.** Staff type questions like *"Magkano ang benta ng diesel ngayon?"* or *"May kulang ba sa diesel?"* Code computes the shift totals and gives them to the model as its only data. The model answers in the same language, in 1–2 sentences, using only those numbers and without disclaimers; it says it can't answer only when the number is truly missing, and code drops a trailing "can't answer exactly" sentence that follows a real answer. If the answer contains a number that isn't in the computed data, PumpLocal shows a warning.
 5. **Offline sync queue.** Every record (shifts, sales, cash checks, expenses, pumps and totalizer readings) is saved locally in SQLite with `synced=0`. A Sync button (plus a background check every 30 s) POSTs unsynced records to `SYNC_URL`. When that fails or `SYNC_URL` isn't set, the header shows **"Offline, N records queued"**. Nothing else depends on the internet.
 6. **Demo data.** On first run the app seeds a realistic shift: 15 sales across Premium (₱64.99/L), Unleaded and Diesel, a ₱50 senior discount, one ₱3,000 diesel credit sale ("Mang Ben (trucking)"), two expenses (₱150 and ₱350), and a **Diesel 2** pump. The pump's opening **peso** totalizer is **775397**, the number on the real photo. **All other pump readings are demo data**: liters 13508 → 13689 and pesos 775397 → 785787. They are chosen so the pump says 181 L / ₱10,390 while the seeded diesel sales add up to 174.216 L / ₱10,000, which shows a 6.784 L / ₱390 (3.75%) gap right away. The implied price is ₱57.40/L, so the price check passes. [`/samples`](samples/) has three **synthetic** images and one **REAL photo** of a totalizer screen from the team's own station (`real_totalizer_diesel2.png`).
 
@@ -99,6 +100,8 @@ Open **http://localhost:8080/slides**, or use the small "Slides" link in the app
 
 To reset demo data: `python3 seed.py --reset`.
 
+**Demo Day:** `python3 seed.py --demo-empty` starts an empty shift (opening float ₱1,000, posted prices and the Diesel 2 opening 775397 preset; no sales). Then read every sample photo live in the order of [DEMO_SCRIPT.md](DEMO_SCRIPT.md), which lists the expected value after each photo, the Cash and Pump results, four Ask questions with the correct numbers, and a 3-minute stage version. `tests/test_demo_script.py` runs that exact sequence and checks the numbers.
+
 ### Tests
 
 ```bash
@@ -140,7 +143,7 @@ If Ollama isn't running, the app still works. On a Mac, photos are still read by
 - **APIs:** none required. The optional sync endpoint (`SYNC_URL`) is the only network call.
 - **Existing code:** none. Everything was built during the hackathon. The real totalizer photo was taken before kickoff.
 - **AI dev tools:** Grok Bot (all code). Claude was used for Mac cleanup only. See above.
-- **Sample images:** three are synthetic, computer-generated (not photos of real pumps or receipts). `samples/real_totalizer_diesel2.png` is a **real photo** of a pump totalizer screen at the team's own station, a real asset. Only its peso reading (775397) is real; the other seeded pump readings, discounts, credit sales and expenses are demo data.
+- **Sample images:** the sale photos, the closing slip and the two closing totalizer screens (`synthetic_totalizer_diesel2_close_*.png`, made-up closings consistent with the real opening) are synthetic, computer-generated (not photos of real pumps or receipts). `samples/real_totalizer_diesel2.png` is a **real photo** of a pump totalizer screen at the team's own station, a real asset. Only its peso reading (775397) is real; the other seeded pump readings, discounts, credit sales and expenses are demo data.
 - **Demo prices:** the seeded prices (Premium ₱64.99, Unleaded ₱61.25, Diesel ₱57.40) are demo values, not live pump prices.
 
 ## Project layout
@@ -152,11 +155,14 @@ ai.py         Photo pipeline (Vision first, Gemma fallback), Ollama calls, promp
 vision.py     Compiles/caches and runs the Apple Vision OCR helper (macOS only)
 meterparse.py OCR lines -> fields in code: label proximity, 1% liters x price check
 totalizer.py  OCR lines -> peso/liter totalizer readings + pump label in code
+slipparse.py  OCR lines -> Shift Closing Slip values in code
 ocr/          ocr.swift (Apple Vision OCR helper; binary is built on first run)
 sync.py       Offline queue + SYNC_URL uploader
 seed.py       Demo shift loader
-static/       index.html (single page, inline CSS/JS), slides.html (offline pitch deck at /slides)
-samples/      Synthetic meter/receipt images + generator, one REAL totalizer photo
+static/       index.html (single page, inline CSS/JS), slides.html (offline pitch deck at /slides),
+              closing_slip_template.html (printable slip at /closing-slip)
+samples/      Synthetic meter/receipt/slip/closing-totalizer images + generators, one REAL totalizer photo
+DEMO_SCRIPT.md Demo Day click order with expected numbers
 tests/        Unit + end-to-end tests
 ```
 
@@ -167,6 +173,7 @@ tests/        Unit + end-to-end tests
 - Apple Vision OCR needs macOS. On Linux, photos are read by Gemma only.
 - One open shift at a time and one station per install. There are no user accounts or login.
 - The sync payload is a simple JSON batch with no authentication or receiving server included. `SYNC_URL` should point at an endpoint you control.
+- Closing slip: tested with typed (synthetic) digits only; real handwriting hasn't been tested. Expenses and credits are matched to saved ones by amount, so changing an amount in the review makes it a new item. Discounts are recorded per sale; the slip's discount total is only compared, not saved.
 - Language detection for answers is a simple Tagalog keyword heuristic.
 - Pump check: sales are matched to pumps by fuel type (sales don't record which nozzle), so pumps of the same fuel are compared as a group. A pump that rolls over past its maximum must be entered by hand. Pump readings sync like expenses, but the price-change and tolerance settings stay local. Credit sales are recorded with a customer name only. There's no utang ledger or payment tracking yet.
 
