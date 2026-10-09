@@ -4,16 +4,16 @@
  "engine": "tesseract (stand-in for Apple Vision)",
  "lines": [
   {
-   "text": "DATE [09 OCT 2026 SHORT 37.90 MACHINE 1 UNLEADED SALES ACTUAL COLLECTIONS",
-   "confidence": 0.787,
+   "text": "DATE [09 OCT 2026 SHORT 38.26 MACHINE 1 UNLEADED SALES ACTUAL COLLECTIONS",
+   "confidence": 0.786,
    "x": 0.1,
    "y": 0.0604,
    "w": 0.8681,
    "h": 0.0091
   },
   {
-   "text": "SHIFT |6:00 AM - 2:00 PM OVER PUMP PRICE: 80.35 Mc: 8,729.22) | MA:",
-   "confidence": 0.785,
+   "text": "SHIFT |6:00 AM - 2:00 PM OVER PUMP PRICE: 85.40 Mc: 9,277.86) | MA:",
+   "confidence": 0.794,
    "x": 0.0963,
    "y": 0.0748,
    "w": 0.7762,
@@ -52,16 +52,16 @@
    "h": 0.0091
   },
   {
-   "text": "1: 50 50 a: 25, 25,",
-   "confidence": 0.717,
+   "text": "1: 50 50 a: 26 26",
+   "confidence": 0.871,
    "x": 0.0587,
-   "y": 0.139,
+   "y": 0.142,
    "w": 0.4269,
-   "h": 0.0181
+   "h": 0.0091
   },
   {
-   "text": "a a0 = aa 7a COIN: e B: COINS DIFF:",
-   "confidence": 0.503,
+   "text": "a a0 = aa 78 COIN: e B: COINS DIFF:",
+   "confidence": 0.501,
    "x": 0.1031,
    "y": 0.1511,
    "w": 0.8037,
@@ -76,16 +76,16 @@
    "h": 0.0181
   },
   {
-   "text": "5 100 20: 18 360 MACHINE 2 DIESEL SALES ACTUAL COLLECTIONS",
-   "confidence": 0.938,
+   "text": "5 100 20: 20 400 MACHINE 2 DIESEL SALES ACTUAL COLLECTIONS",
+   "confidence": 0.939,
    "x": 0.1062,
    "y": 0.1956,
    "w": 0.8619,
    "h": 0.0098
   },
   {
-   "text": "50: 20 1,000 50: 27 1,350 PUMP PRICE: 79.85|{ Mc: 18,482.88 | | ma:",
-   "confidence": 0.718,
+   "text": "50: 20 1,000 50: 27 1,350 PUMP PRICE: 94.50|| Mc: 21,873.92 | | Ma:",
+   "confidence": 0.722,
    "x": 0.0531,
    "y": 0.2062,
    "w": 0.8194,
@@ -100,8 +100,8 @@
    "h": 0.0227
   },
   {
-   "text": "20 200: 6 1,200 VOLUME: 4102.76| | Ma: COINS:",
-   "confidence": 0.822,
+   "text": "20 200: 7 1,400 VOLUME: 4102.76| | Ma: COINS:",
+   "confidence": 0.807,
    "x": 0.0469,
    "y": 0.2424,
    "w": 0.8394,
@@ -116,16 +116,16 @@
    "h": 0.0113
   },
   {
-   "text": "1000: 1000: 34 34,000 COIN: e B: COINS DIFF:",
-   "confidence": 0.779,
+   "text": "1000: 1000: 39 39,000 COIN: e B: COINS DIFF:",
+   "confidence": 0.781,
    "x": 0.0413,
    "y": 0.2787,
    "w": 0.8656,
    "h": 0.0227
   },
   {
-   "text": "CASH TOTAL: 3,500.00 ‘CASH TOTAL: 51,725.00 BANK: 327645",
-   "confidence": 0.881,
+   "text": "CASH TOTAL: 3,500.00 ‘CASH TOTAL: 56,966.00 BANK: 327645",
+   "confidence": 0.879,
    "x": 0.0806,
    "y": 0.3006,
    "w": 0.6125,
@@ -140,8 +140,8 @@
    "h": 0.0128
   },
   {
-   "text": "AMOUNT DETAILS / NAME SIGNATURE PUMP PRICE: 81.95 Mc: 15,354.15 | | MA:",
-   "confidence": 0.801,
+   "text": "AMOUNT DETAILS / NAME SIGNATURE PUMP PRICE: 85.90 Mc: 16,094.22 | | MA:",
+   "confidence": 0.764,
    "x": 0.0469,
    "y": 0.3437,
    "w": 0.8256,
@@ -196,8 +196,8 @@
    "h": 0.0076
   },
   {
-   "text": "725.00 | TOTAL PUMP PRICE: 81.95|| Mc: 11,651.65 | Ma:",
-   "confidence": 0.789,
+   "text": "725.00 | TOTAL PUMP PRICE: 85.90|| Mc: 12,213.26 | | Ma:",
+   "confidence": 0.678,
    "x": 0.0756,
    "y": 0.4758,
    "w": 0.7969,
@@ -252,8 +252,8 @@
    "h": 0.0083
   },
   {
-   "text": "TOTAL SALES (FUEL) 54,217.90 SUMMARY: PETTY CASH 3,500.00] TOTAL SALES 54,217.90",
-   "confidence": 0.872,
+   "text": "TOTAL SALES (FUEL) 59,459.26 SUMMARY: PETTY CASH 3,500.00] TOTAL SALES 59,459.26",
+   "confidence": 0.883,
    "x": 0.025,
    "y": 0.5937,
    "w": 0.9494,
@@ -268,8 +268,8 @@
    "h": 0.0106
   },
   {
-   "text": "- TOTAL EXPENSES, 725.00 TOTAL CASH + EXPENSES & COLLECTIONS 57,680.00",
-   "confidence": 0.92,
+   "text": "- TOTAL EXPENSES, 725.00 TOTAL CASH + EXPENSES & COLLECTIONS 62,921.00",
+   "confidence": 0.922,
    "x": 0.0256,
    "y": 0.642,
    "w": 0.9487,
@@ -284,24 +284,24 @@
    "h": 0.0106
   },
   {
-   "text": "= EXPECTED CASH 51,762.90 FLEET ACCT A (CHARGE) 2,450.00| 09/10/26 | CREDIT - PAY 30 DAYS",
-   "confidence": 0.811,
+   "text": "= EXPECTED CASH 57,004.26 FLEET ACCT A (CHARGE) 2,450.00| 09/10/26 |CREDIT - PAY 30 DAYS",
+   "confidence": 0.943,
    "x": 0.0256,
-   "y": 0.676,
+   "y": 0.6775,
    "w": 0.9019,
-   "h": 0.0189
+   "h": 0.0121
   },
   {
-   "text": "ACTUAL CASH (PETTY CASH OUT) 51,725.00 GCASH 1,280.00 REF ...4821",
-   "confidence": 0.904,
+   "text": "ACTUAL CASH (PETTY CASH OUT) 56,966.00 GCASH 1,280.00 REF ...4821",
+   "confidence": 0.9,
    "x": 0.025,
    "y": 0.6956,
    "w": 0.8488,
    "h": 0.0121
   },
   {
-   "text": "OVER / (SHORT) (37.90) CARD (DEBIT) 1,500.00 APPROVAL 503318",
-   "confidence": 0.947,
+   "text": "OVER / (SHORT) (38.26) CARD (DEBIT) 1,500.00 APPROVAL 503318",
+   "confidence": 0.951,
    "x": 0.0256,
    "y": 0.7107,
    "w": 0.8719,

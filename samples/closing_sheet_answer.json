@@ -11,11 +11,11 @@
     {
       "machine": "MACHINE 1",
       "product": "UNLEADED",
-      "pump_price": 80.35,
+      "pump_price": 85.4,
       "opening_volume": 4682.47,
       "closing_volume": 4791.11,
       "liters_sold": 108.64,
-      "sales_amount": 8729.22,
+      "sales_amount": 9277.86,
       "money_all": 385210,
       "coin": 0,
       "bank": 385210
@@ -23,11 +23,11 @@
     {
       "machine": "MACHINE 2",
       "product": "DIESEL",
-      "pump_price": 79.85,
+      "pump_price": 94.5,
       "opening_volume": 3871.29,
       "closing_volume": 4102.76,
       "liters_sold": 231.47,
-      "sales_amount": 18482.88,
+      "sales_amount": 21873.92,
       "money_all": 327645,
       "coin": 0,
       "bank": 327645
@@ -35,11 +35,11 @@
     {
       "machine": "MACHINE 3",
       "product": "PREMIUM",
-      "pump_price": 81.95,
+      "pump_price": 85.9,
       "opening_volume": 17302.54,
       "closing_volume": 17489.9,
       "liters_sold": 187.36,
-      "sales_amount": 15354.15,
+      "sales_amount": 16094.22,
       "money_all": 1433318,
       "coin": 0,
       "bank": 1433318
@@ -47,17 +47,17 @@
     {
       "machine": "MACHINE 4",
       "product": "PREMIUM",
-      "pump_price": 81.95,
+      "pump_price": 85.9,
       "opening_volume": 4196.62,
       "closing_volume": 4338.8,
       "liters_sold": 142.18,
-      "sales_amount": 11651.65,
+      "sales_amount": 12213.26,
       "money_all": 355541,
       "coin": 0,
       "bank": 355541
     }
   ],
-  "total_sales": 54217.9,
+  "total_sales": 59459.26,
   "liters_by_product": {
     "UNLEADED": 108.64,
     "DIESEL": 231.47,
@@ -91,28 +91,28 @@
   },
   "petty_cash_out": {
     "counts": {
-      "1": 25,
+      "1": 26,
       "5": 14,
       "10": 22,
-      "20": 18,
+      "20": 20,
       "50": 27,
       "100": 40,
-      "200": 6,
+      "200": 7,
       "500": 21,
-      "1000": 34
+      "1000": 39
     },
     "amounts": {
-      "1": 25,
+      "1": 26,
       "5": 70,
       "10": 220,
-      "20": 360,
+      "20": 400,
       "50": 1350,
       "100": 4000,
-      "200": 1200,
+      "200": 1400,
       "500": 10500,
-      "1000": 34000
+      "1000": 39000
     },
-    "total": 51725.0
+    "total": 56966.0
   },
   "expenses": [
     {
@@ -171,11 +171,11 @@
   "total_collections": 5230.0,
   "summary_petty_cash": 3500,
   "opening_float": 3500,
-  "total_cash_expenses_collections": 57680.0,
-  "expected_cash": 51762.9,
-  "actual_cash": 51725.0,
-  "over_short": -37.9,
-  "short": 37.9,
+  "total_cash_expenses_collections": 62921.0,
+  "expected_cash": 57004.26,
+  "actual_cash": 56966.0,
+  "over_short": -38.26,
+  "short": 38.26,
   "over": 0,
   "formulas": {
     "liters_sold": "closing_volume - opening_volume (VOLUME - PREV VOLUME)",

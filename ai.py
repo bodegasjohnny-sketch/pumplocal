@@ -184,8 +184,8 @@ def fields_from_obj(obj):
 
 
 MOCK_EXTRACT = ('Sure! Here is what I can read from the meter:\n```json\n'
-                '{"fuel_type": "PREMIUM", "liters": null, "price_per_liter": "64.99", '
-                '"amount_pesos": "₱1,000.00"}\n```')
+                '{"fuel_type": "PREMIUM", "liters": null, "price_per_liter": "85.90", '
+                '"amount_pesos": "₱1,030.80"}\n```')
 
 
 def extract(image_b64):
@@ -467,8 +467,8 @@ SLIP_PROMPT = (
 )
 MOCK_SLIP = ('Here is the text:\n```json\n{"lines": ["JCB SHIFT CLOSING SLIP", "DATE 09 OCT 2026", "SHIFT 6AM - 2PM", '
              '"OPENING FLOAT 1,000.00", "EXPENSES", "ICE AND WATER 60.00", "NOZZLE O-RING 350.00", "DISCOUNTS 20.00", '
-             '"CREDIT / UTANG", "MANG BEN - DIESEL 1,000.00", "GCASH 500.00", "CARD 300.00", '
-             '"CASH COUNTED 3,220.00"]}\n```')
+             '"CREDIT / UTANG", "MANG BEN - DIESEL 945.00", "GCASH 500.00", "CARD 300.00", '
+             '"CASH COUNTED 3,263.20"]}\n```')
 
 
 def _slip_result(p, raw, seconds, reader, source):

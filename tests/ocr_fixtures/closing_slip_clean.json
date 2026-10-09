@@ -84,12 +84,12 @@
    "h": 0.0208
   },
   {
-   "text": "MANG BEN - DIESEL 1,000.00",
-   "confidence": 0.934,
+   "text": "MANG BEN - DIESEL 945.00",
+   "confidence": 0.933,
    "x": 0.096,
    "y": 0.6679,
-   "w": 0.834,
-   "h": 0.0226
+   "w": 0.833,
+   "h": 0.0195
   },
   {
    "text": "GCASH 500.00",
@@ -108,8 +108,8 @@
    "h": 0.0208
   },
   {
-   "text": "CASH COUNTED 3,220.00",
-   "confidence": 0.962,
+   "text": "CASH COUNTED 3,263.20",
+   "confidence": 0.963,
    "x": 0.062,
    "y": 0.9048,
    "w": 0.868,

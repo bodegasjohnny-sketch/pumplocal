@@ -56,7 +56,7 @@ class ParseTests(unittest.TestCase):
         obj = ai.parse_json_text(ai.MOCK_EXTRACT)
         f = ai.fields_from_obj(obj)
         self.assertEqual(f["fuel_type"], "Premium")
-        self.assertEqual(f["amount_pesos"], core.Decimal("1000.00"))
+        self.assertEqual(f["amount_pesos"], core.Decimal("1030.80"))
 
     def test_trailing_comma_and_single_quotes(self):
         self.assertEqual(ai.parse_json_text("x {'liters': 5.5,} y")["liters"], 5.5)

@@ -8,8 +8,8 @@ import unittest
 from tests.test_flow import FAKE_OCR, FIXTURES, ROOT, FakeOllama, Server, call, free_port, start_fake
 
 REAL = os.path.join(ROOT, "samples", "real_totalizer_diesel2.png")
-HEADLINE = "Pump says 181 L dispensed; recorded sales 174.216 L; 6.784 L (3.75%) unaccounted."
-PESO_HEADLINE = "Pump says ₱10,390.00 dispensed; recorded sales ₱10,000.00; ₱390.00 (3.75%) unaccounted."
+HEADLINE = "Pump says 105 L dispensed; recorded sales 101 L; 4 L (3.81%) unaccounted."
+PESO_HEADLINE = "Pump says ₱9,922.00 dispensed; recorded sales ₱9,544.50; ₱377.50 (3.80%) unaccounted."
 
 
 def real_b64():
@@ -33,19 +33,19 @@ class PumpFlowTest(unittest.TestCase):
         p = j["check"]["pumps"][0]
         self.assertEqual((p["name"], p["fuel_type"], p["amount_decimals"], p["volume_decimals"]), ("Diesel 2", "Diesel", 0, 0))
         self.assertEqual((p["opening_amount"], p["closing_amount"], p["opening_volume"], p["closing_volume"]),
-                         ("775397", "785787", "13508", "13689"))
-        self.assertEqual((p["dispensed_amount_text"], p["dispensed_volume_text"]), ("₱10,390.00", "181 L"))
+                         ("775397", "785319", "13508", "13613"))
+        self.assertEqual((p["dispensed_amount_text"], p["dispensed_volume_text"]), ("₱9,922.00", "105 L"))
         g = j["check"]["groups"][0]
         self.assertEqual((g["status"], g["flag"]), ("UNACCOUNTED", True))
         self.assertEqual((g["liters"]["dispensed"], g["liters"]["recorded"], g["liters"]["gap"], g["liters"]["gap_pct"]),
-                         ("181.000", "174.216", "6.784", "3.75"))
+                         ("105.000", "101.000", "4.000", "3.81"))
         self.assertEqual((g["pesos"]["dispensed"], g["pesos"]["recorded"], g["pesos"]["gap"]),
-                         ("10390.00", "10000.00", "390.00"))
+                         ("9922.00", "9544.50", "377.50"))
         self.assertEqual(g["headline"], HEADLINE + " " + PESO_HEADLINE)
-        self.assertEqual((g["price"]["implied"], g["price"]["ok"]), ("57.40", True))
+        self.assertEqual((g["price"]["implied"], g["price"]["ok"]), ("94.50", True))
         self.assertEqual(j["tolerance_pct"], "0.5")
         code, sh = call(self.b, "/api/shift")
-        self.assertEqual((sh["count"], sh["total_amount"]), (15, "16350.00"))  # seed sales unchanged
+        self.assertEqual((sh["count"], sh["total_amount"]), (15, "15971.75"))  # seed sales unchanged
         code, samples = call(self.b, "/api/samples")
         self.assertEqual(samples["pump_samples"], ["real_totalizer_diesel2.png", "synthetic_totalizer_diesel2_close_money.png",
                                                    "synthetic_totalizer_diesel2_close_volume.png"])
@@ -61,19 +61,19 @@ class PumpFlowTest(unittest.TestCase):
     def test_3_ask_tagalog_pump_gap(self):
         code, a = call(self.b, "/api/ask", {"question": "May kulang ba sa diesel?"})
         self.assertEqual(a["lang"], "tl")
-        self.assertIn("6.784 L (3.75%) ang hindi naitala", a["answer"])
+        self.assertIn("4 L (3.81%) ang hindi naitala", a["answer"])
         self.assertTrue(a["answer"].startswith("Oo."))
         self.assertEqual(a["unverified_numbers"], [])
         self.assertIn("Diesel pump check: " + HEADLINE, a["context"])
-        self.assertIn("peso totalizer opening 775397, closing 785787", a["context"])
-        self.assertIn("Price check OK: implied ₱57.40/L", a["context"])
+        self.assertIn("peso totalizer opening 775397, closing 785319", a["context"])
+        self.assertIn("Price check OK: implied ₱94.50/L", a["context"])
         code, a = call(self.b, "/api/ask", {"question": "Is any diesel unaccounted at the pump?"})
         self.assertIn(HEADLINE, a["answer"])
         code, a = call(self.b, "/api/ask", {"question": "May kulang ba sa premium?"})
         self.assertIn("Wala pang reading", a["answer"])
 
     def test_4_cash_check_includes_pump_gap(self):
-        code, c = call(self.b, "/api/cashcheck", {"declared": "12800", "lang": "en"})
+        code, c = call(self.b, "/api/cashcheck", {"declared": "12586.75", "lang": "en"})
         self.assertEqual(c["result"]["status"], "OK")
         self.assertEqual(c["pump_check"]["flagged"][0]["headline"], HEADLINE + " " + PESO_HEADLINE)
         self.assertIn(HEADLINE, c["pump_text"])
@@ -90,11 +90,11 @@ class PumpFlowTest(unittest.TestCase):
         pid = j["pumps"][0]["id"]
         code, j = call(self.b, "/api/pump/save", {"id": pid, "name": "Diesel 2", "fuel_type": "Diesel", "volume_decimals": 2})
         g = j["check"]["groups"][0]
-        self.assertEqual((g["liters"]["dispensed"], g["liters"]["status"]), ("1.810", "OVER_RECORDED"))  # 135.08->136.89
-        self.assertFalse(g["price"]["ok"])  # P10,390 / 1.81 L is not a real price: warning
+        self.assertEqual((g["liters"]["dispensed"], g["liters"]["status"]), ("1.050", "OVER_RECORDED"))  # 135.08->136.13
+        self.assertFalse(g["price"]["ok"])  # P9,922 / 1.05 L is not a real price: warning
         call(self.b, "/api/pump/save", {"id": pid, "name": "Diesel 2", "fuel_type": "Diesel", "volume_decimals": 0})
-        code, j = call(self.b, "/api/pump/price_change", {"fuel_type": "Diesel", "old_price": "57.40", "new_price": "58.90"})
-        self.assertEqual(j["check"]["groups"][0]["price_change"], {"old": "57.40", "new": "58.90"})
+        code, j = call(self.b, "/api/pump/price_change", {"fuel_type": "Diesel", "old_price": "94.50", "new_price": "95.90"})
+        self.assertEqual(j["check"]["groups"][0]["price_change"], {"old": "94.50", "new": "95.90"})
         self.assertEqual(call(self.b, "/api/pump/price_change", {"fuel_type": "Diesel", "old_price": "x",
                                                                  "new_price": "1"})[0], 400)
         call(self.b, "/api/pump/price_change", {"fuel_type": "Diesel", "old_price": "", "new_price": ""})
@@ -113,14 +113,14 @@ class PumpFlowTest(unittest.TestCase):
         self.assertIn("lower than opening", j["warnings"][0])
         prem = [g for g in j["check"]["groups"] if g["fuel_type"] == "Premium"][0]
         self.assertEqual((prem["status"], prem["flag"]), ("ERROR", True))
-        # Premium sales: 1000 + 300 + 500 + 2000 = P3,800 = 58.471 L at 64.99 (+ test_5 nothing)
-        code, j = call(self.b, "/api/pump/reading", {"pump_id": pid, "kind": "close", "amount": "1003800",
-                                                     "volume": "20058", "source": "photo"})
+        # Premium sales: 12 + 3.5 + 6 + 23 = 44.5 L = P3,822.55 at 85.90 (+ test_5 nothing)
+        code, j = call(self.b, "/api/pump/reading", {"pump_id": pid, "kind": "close", "amount": "1003823",
+                                                     "volume": "20044", "source": "photo"})
         prem = [g for g in j["check"]["groups"] if g["fuel_type"] == "Premium"][0]
         self.assertEqual((prem["pesos"]["dispensed"], prem["pesos"]["recorded"], prem["pesos"]["status"]),
-                         ("3800.00", "3800.00", "OK"))
-        self.assertEqual((prem["liters"]["dispensed"], prem["liters"]["status"]), ("58.000", "OVER_RECORDED"))
-        self.assertEqual(prem["price"]["implied"], "65.52")
+                         ("3823.00", "3822.55", "OK"))
+        self.assertEqual((prem["liters"]["dispensed"], prem["liters"]["status"]), ("44.000", "OVER_RECORDED"))
+        self.assertEqual(prem["price"]["implied"], "86.89")
         self.assertFalse(prem["price"]["ok"])
         self.assertEqual(call(self.b, "/api/pump/reading", {"pump_id": pid, "kind": "close", "amount": "x"})[0], 400)
         self.assertEqual(call(self.b, "/api/pump/reading", {"pump_id": 999, "kind": "close", "amount": "1"})[0], 400)
@@ -157,7 +157,7 @@ class PumpPipelineTest(unittest.TestCase):
         try:
             code, j = call(s.base, "/api/pump/check", {"lang": "tl"})
             self.assertEqual(j["explanation_source"], "ai")
-            self.assertIn("6.784 L (3.75%) unaccounted", FakeOllama.last_chat["messages"][-1]["content"])
+            self.assertIn("4 L (3.81%) unaccounted", FakeOllama.last_chat["messages"][-1]["content"])
         finally:
             s.stop()
             srv.shutdown()

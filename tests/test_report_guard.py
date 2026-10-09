@@ -36,11 +36,11 @@ class ReportGuardTests(unittest.TestCase):
 
     def test_existing_samples_pass_the_guard_and_parse_unchanged(self):
         expected = {
-            "meter_premium.json": {"fuel_type": "Premium", "liters": "15.387", "price_per_liter": "64.99",
-                                   "amount_pesos": "1000.00"},
-            "meter_unleaded.json": {"fuel_type": "Unleaded", "liters": "8.163", "price_per_liter": "61.25",
-                                    "amount_pesos": "500.00"},
-            "receipt_diesel.json": {"fuel_type": "Diesel", "liters": "34.843", "price_per_liter": "57.40",
+            "meter_premium.json": {"fuel_type": "Premium", "liters": "12.000", "price_per_liter": "85.90",
+                                   "amount_pesos": "1030.80"},
+            "meter_unleaded.json": {"fuel_type": "Unleaded", "liters": "6.000", "price_per_liter": "85.40",
+                                    "amount_pesos": "512.40"},
+            "receipt_diesel.json": {"fuel_type": "Diesel", "liters": "21.164", "price_per_liter": "94.50",
                                     "amount_pesos": "2000.00"},
         }
         for name, fields in expected.items():

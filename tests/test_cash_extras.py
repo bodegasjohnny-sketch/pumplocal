@@ -122,7 +122,7 @@ class CashExtrasFlowTest(unittest.TestCase):
     def test_1_seed(self):
         code, sh = call(self.b, "/api/shift")
         self.assertEqual((sh["count"], sh["total_amount"], sh["discounts_total"], sh["credit_total"], sh["expenses_total"]),
-                         (15, "16350.00", "50.00", "3000.00", "500.00"))
+                         (15, "15971.75", "50.00", "2835.00", "500.00"))
         self.assertEqual(sh["credit_sales"][0]["customer"], "Mang Ben (trucking)")
         self.assertEqual([e["description"] for e in sh["expenses"]], ["Ice and drinking water", "Nozzle O-ring (hardware)"])
 
@@ -138,26 +138,26 @@ class CashExtrasFlowTest(unittest.TestCase):
         self.assertEqual(call(self.b, "/api/shift")[1]["expenses_total"], "500.00")
 
     def test_3_discount_and_credit_endpoints(self):
-        code, j = call(self.b, "/api/sales", {"fuel_type": "Premium", "amount_pesos": "1000", "price_per_liter": "64.99",
+        code, j = call(self.b, "/api/sales", {"fuel_type": "Premium", "amount_pesos": "1030.80", "price_per_liter": "85.90",
                                               "discount_pesos": "30", "discount_reason": "suki"})
         self.assertEqual((code, j["sale"]["discount_pesos"]), (200, "30.00"))
         self.assertEqual(call(self.b, "/api/sales", {"fuel_type": "Premium", "amount_pesos": "1000",
-                                                     "price_per_liter": "64.99", "discount_pesos": "30"})[0], 400)
-        code, j = call(self.b, "/api/credit", {"customer": "Aling Nena", "fuel_type": "Unleaded", "amount_pesos": "612.50"})
-        self.assertEqual((code, j["sale"]["payment"], j["sale"]["liters"]), (200, "credit", "10.000"))  # 612.50 / 61.25
+                                                     "price_per_liter": "85.90", "discount_pesos": "30"})[0], 400)
+        code, j = call(self.b, "/api/credit", {"customer": "Aling Nena", "fuel_type": "Unleaded", "amount_pesos": "854.00"})
+        self.assertEqual((code, j["sale"]["payment"], j["sale"]["liters"]), (200, "credit", "10.000"))  # 854.00 / 85.40
         self.assertEqual(call(self.b, "/api/credit", {"fuel_type": "Unleaded", "amount_pesos": "100"})[0], 400)
 
     def test_4_cash_check_with_count(self):
-        # gross 16350 + 1000 + 612.50 = 17962.50; discounts 80; credit 3612.50; expenses 500 -> expected 13770
-        code, c = call(self.b, "/api/cash/count", {"counts": {"1000": 13, "500": 1, "200": 1, "20": 3, "coins": "10"}})
-        self.assertEqual(c["total"], "13770.00")
+        # gross 15971.75 + 1030.80 + 854 = 17856.55; discounts 80; credit 2835 + 854 = 3689; expenses 500 -> expected 13587.55
+        code, c = call(self.b, "/api/cash/count", {"counts": {"1000": 13, "500": 1, "20": 4, "coins": "7.55"}})
+        self.assertEqual(c["total"], "13587.55")
         self.assertEqual(call(self.b, "/api/cash/count", {"counts": {"100": "x"}})[0], 400)
-        code, c = call(self.b, "/api/cashcheck", {"counts": {"1000": 13, "500": 1, "200": 1, "20": 3, "coins": "10"}})
+        code, c = call(self.b, "/api/cashcheck", {"counts": {"1000": 13, "500": 1, "20": 4, "coins": "7.55"}})
         r = c["result"]
         self.assertEqual((r["gross_sales"], r["discounts"], r["credit_sales"], r["expenses"], r["expected"], r["declared"],
-                          r["status"]), ("17962.50", "80.00", "3612.50", "500.00", "13770.00", "13770.00", "OK"))
-        self.assertEqual(r["count"]["total"], "13770.00")
-        self.assertEqual(json.loads(c["record"]["cash_count"])["total"], "13770.00")
+                          r["status"]), ("17856.55", "80.00", "3689.00", "500.00", "13587.55", "13587.55", "OK"))
+        self.assertEqual(r["count"]["total"], "13587.55")
+        self.assertEqual(json.loads(c["record"]["cash_count"])["total"], "13587.55")
         code, c = call(self.b, "/api/cashcheck", {"declared": "13000", "counts": {"1000": 13}})
         self.assertEqual(c["result"]["declared"], "13000.00")  # a typed amount wins over the count
         self.assertEqual(call(self.b, "/api/cashcheck", {})[0], 400)
@@ -168,7 +168,7 @@ class CashExtrasFlowTest(unittest.TestCase):
         self.assertIn("Utang", a["answer"])
         self.assertEqual(a["unverified_numbers"], [])
         self.assertIn("Expenses (petty cash out): ₱500.00", a["context"])
-        self.assertIn("- discounts ₱80.00 - credit ₱3,612.50 - expenses ₱500.00", a["context"])
+        self.assertIn("- discounts ₱80.00 - credit ₱3,689.00 - expenses ₱500.00", a["context"])
         code, a = call(self.b, "/api/ask", {"question": "How much were expenses this shift?"})
         self.assertIn("Ice and drinking water ₱150.00", a["answer"])
         code, a = call(self.b, "/api/ask", {"question": "Magkano ang diskwento?"})

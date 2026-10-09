@@ -32,11 +32,11 @@ PHOTOS = {  # sample -> recorded OCR text
 }
 # Every one of these must appear in DEMO_SCRIPT.md.
 EXPECTED_IN_SCRIPT = [
-    "Premium · 15.387 L × ₱64.99 = ₱1,000.00", "Unleaded · 8.163 L × ₱61.25 = ₱500.00",
-    "Diesel · 34.843 L × ₱57.40 = ₱2,000.00", "775397", "778611", "13564",
-    "Pump says 56 L dispensed; recorded sales 52.265 L; 3.735 L (6.67%) unaccounted",
-    "Pump says ₱3,214.00 dispensed; recorded sales ₱3,000.00; ₱214.00 (6.66%) unaccounted",
-    "₱57.39/L", "₱3,270.00", "₱3,220.00", "-₱50.00", "-1.53%", "₱4,500.00", "75.815", "₱3,000.00", "52.265",
+    "Premium · 12.000 L × ₱85.90 = ₱1,030.80", "Unleaded · 6.000 L × ₱85.40 = ₱512.40",
+    "Diesel · 21.164 L × ₱94.50 = ₱2,000.00", "775397", "778421", "13540",
+    "Pump says 32 L dispensed; recorded sales 31.164 L; 0.836 L (2.61%) unaccounted",
+    "Pump says ₱3,024.00 dispensed; recorded sales ₱2,945.00; ₱79.00 (2.61%) unaccounted",
+    "₱94.50/L", "₱3,313.20", "₱3,263.20", "-₱50.00", "-1.51%", "₱4,488.20", "49.164", "₱2,945.00", "31.164",
 ]
 
 
@@ -102,8 +102,8 @@ class DemoScriptTest(unittest.TestCase):
 
         # 4-6. Pump tab: REAL photo = opening (peso), synthetic closings (peso, then liter)
         for photo, kind, key, want in (("real_totalizer_diesel2.png", "open", "amount", "775397"),
-                                       ("synthetic_totalizer_diesel2_close_money.png", "close", "amount", "778611"),
-                                       ("synthetic_totalizer_diesel2_close_volume.png", "close", "volume", "13564")):
+                                       ("synthetic_totalizer_diesel2_close_money.png", "close", "amount", "778421"),
+                                       ("synthetic_totalizer_diesel2_close_volume.png", "close", "volume", "13540")):
             j = self.read("/api/pump/extract", photo)
             self.assertEqual((j[key], j["pump_name"]), (want, "Diesel 2"), j)
             code, r = call(self.b, "/api/pump/reading", {"pump_id": diesel2["id"], "kind": kind, key: j[key],
@@ -117,7 +117,7 @@ class DemoScriptTest(unittest.TestCase):
         self.assertEqual([e["status"] for e in c["expenses"]], ["new", "new"])
         self.assertEqual([(x["customer"], x["fuel_type"], x["status"]) for x in c["credits"]], [("Mang Ben", "Diesel", "new")])
         self.assertEqual(c["discounts"], {"slip": "20.00", "recorded": "20.00", "match": True})
-        self.assertEqual((c["preview"]["expected"], c["preview"]["diff"]), ("3270.00", "-50.00"))
+        self.assertEqual((c["preview"]["expected"], c["preview"]["diff"]), ("3313.20", "-50.00"))
         code, a = call(self.b, "/api/slip/apply", {"slip": j["slip"]})
         self.assertEqual((code, len(a["saved_expenses"]), len(a["saved_credits"]), a["errors"]), (200, 2, 1, []))
         code, cash = call(self.b, "/api/cashcheck", {"declared": j["slip"]["cash_counted"], "lang": "tl",
@@ -126,8 +126,8 @@ class DemoScriptTest(unittest.TestCase):
         r = cash["result"]
         self.assertEqual((r["opening_float"], r["gross_sales"], r["discounts"], r["credit_sales"], r["expenses"],
                           r["noncash"], r["expected"], r["declared"], r["diff"], r["diff_pct"], r["status"]),
-                         ("1000.00", "4500.00", "20.00", "1000.00", "410.00", "800.00", "3270.00", "3220.00",
-                          "-50.00", "-1.53", "SHORT"))
+                         ("1000.00", "4488.20", "20.00", "945.00", "410.00", "800.00", "3313.20", "3263.20",
+                          "-50.00", "-1.51", "SHORT"))
 
         # Pump result after everything is saved (the credit sale is diesel too)
         code, pump = call(self.b, "/api/pump")
@@ -136,7 +136,7 @@ class DemoScriptTest(unittest.TestCase):
         self.assertIn(EXPECTED_IN_SCRIPT[6], g["headline"])
         self.assertIn(EXPECTED_IN_SCRIPT[7], g["headline"])
         self.assertTrue(g["price"]["ok"])
-        self.assertIn("₱57.39/L", g["price"]["text"])
+        self.assertIn("implied ₱94.50/L", g["price"]["text"])
 
         # 9-12. Ask
         answers = {}
@@ -145,12 +145,13 @@ class DemoScriptTest(unittest.TestCase):
             code, ans = call(self.b, "/api/ask", {"question": q})
             answers[q] = ans["answer"]
             self.assertEqual(ans["unverified_numbers"], [], ans)
-        self.assertIn("₱3,000.00", answers["Magkano ang benta ng diesel ngayon?"])
-        self.assertIn("52.265", answers["Magkano ang benta ng diesel ngayon?"])
-        self.assertIn("₱4,500.00", answers["What were total sales today?"])
-        self.assertIn("75.815", answers["What were total sales today?"])
-        self.assertIn("3.735 L", answers["Is any diesel missing?"])
-        self.assertIn("₱214.00", answers["Is any diesel missing?"])
+        self.assertIn("₱2,945.00", answers["Magkano ang benta ng diesel ngayon?"])
+        self.assertIn("31.164", answers["Magkano ang benta ng diesel ngayon?"])
+        self.assertIn("₱4,488.20", answers["What were total sales today?"])
+        self.assertIn("49.164", answers["What were total sales today?"])
+        self.assertIn("0.836 L", answers["Is any diesel missing?"])
+        self.assertIn("₱79.00", answers["Is any diesel missing?"])
+        self.assertIn("₱3,313.20", answers["May kulang ba sa cash?"])
         self.assertIn("₱50.00", answers["May kulang ba sa cash?"])
         self.assertIn("kulang", answers["May kulang ba sa cash?"].lower())
 

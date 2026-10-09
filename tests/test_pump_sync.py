@@ -90,12 +90,12 @@ class PumpSyncTests(unittest.TestCase):
         first, _, _ = core.save_reading(self.pump["id"], "close", amount="785780")
         sync.sync_now()
         self.assertEqual(self.queued("totalizer_readings"), 0)
-        again, errors, _ = core.save_reading(self.pump["id"], "close", amount="785787", volume="13689")
+        again, errors, _ = core.save_reading(self.pump["id"], "close", amount="785319", volume="13613")
         self.assertEqual((errors, again["id"], again["synced"]), ([], first["id"], 0))
         self.assertEqual(core.rows("SELECT COUNT(*) AS n FROM totalizer_readings")[0]["n"], 1)
         sync.sync_now()
         sent = Receiver.batches[-1]["records"]["totalizer_readings"]
-        self.assertEqual([(r["id"], r["amount"], r["volume"]) for r in sent], [(first["id"], "785787", "13689")])
+        self.assertEqual([(r["id"], r["amount"], r["volume"]) for r in sent], [(first["id"], "785319", "13613")])
         self.assertEqual(self.queued("totalizer_readings"), 0)
 
     def test_pump_settings_change_requeues_the_pump(self):
@@ -118,11 +118,11 @@ class PumpSyncTests(unittest.TestCase):
         self.assertEqual(self.queued("totalizer_readings"), 0)
 
     def test_carried_opening_on_new_shift_is_queued(self):
-        core.save_reading(self.pump["id"], "close", amount="785787", volume="13689")
+        core.save_reading(self.pump["id"], "close", amount="785319", volume="13613")
         sync.sync_now()
         new = core.new_shift()
         carried = core.rows("SELECT * FROM totalizer_readings WHERE shift_id=?", (new["id"],))
-        self.assertEqual([(r["kind"], r["amount"], r["synced"]) for r in carried], [("open", "785787", 0)])
+        self.assertEqual([(r["kind"], r["amount"], r["synced"]) for r in carried], [("open", "785319", 0)])
 
     def test_old_database_gets_synced_columns(self):
         path = os.path.join(tempfile.mkdtemp(), "old.db")

@@ -3,7 +3,8 @@
 Run:  python3 seed.py          (only seeds if the database is empty)
       python3 seed.py --reset  (wipes local data and seeds again)
 
-Prices are demo values for this hackathon, not live pump prices.
+Prices are the real JCB pump prices as of Oct 9, 2026 (Premium 85.90, Unleaded 85.40, Diesel 94.50).
+Sales, customers, expenses and pump readings are demo data (made up), except the real opening peso totalizer 775397.
 """
 import os
 import sys
@@ -11,14 +12,15 @@ from datetime import datetime, timedelta
 
 import core
 
-DEMO_PRICES = {"Premium": "64.99", "Unleaded": "61.25", "Diesel": "57.40"}
+DEMO_PRICES = {"Premium": "85.90", "Unleaded": "85.40", "Diesel": "94.50"}  # real JCB prices, Oct 9, 2026
 
-# (minutes after shift start, fuel, peso amount). Liters are computed in code from pesos / price.
+# (minutes after shift start, fuel, liters). Pesos are computed in code: liters x price, rounded half-up,
+# so every seeded sale is exactly consistent.
 DEMO_SALES = [
-    (8, "Unleaded", "500"), (15, "Diesel", "1000"), (22, "Premium", "1000"), (31, "Diesel", "2500"),
-    (40, "Unleaded", "200"), (47, "Premium", "300"), (55, "Diesel", "1500"), (63, "Unleaded", "1000"),
-    (71, "Diesel", "3000"), (80, "Premium", "500"), (92, "Unleaded", "150"), (104, "Diesel", "800"),
-    (118, "Premium", "2000"), (131, "Unleaded", "700"), (145, "Diesel", "1200"),
+    (8, "Unleaded", "6"), (15, "Diesel", "10"), (22, "Premium", "12"), (31, "Diesel", "25"),
+    (40, "Unleaded", "2.5"), (47, "Premium", "3.5"), (55, "Diesel", "15"), (63, "Unleaded", "12"),
+    (71, "Diesel", "30"), (80, "Premium", "6"), (92, "Unleaded", "2"), (104, "Diesel", "8.5"),
+    (118, "Premium", "23"), (131, "Unleaded", "8"), (145, "Diesel", "12.5"),
 ]
 
 
@@ -33,11 +35,11 @@ DEMO_EXPENSES = [(60, "150", "Ice and drinking water"), (125, "350", "Nozzle O-r
 # Pump totalizer demo: two running totals per pump, read as whole numbers as displayed.
 # PESO (Money) opening 775397 is the number on the REAL photo samples/real_totalizer_diesel2.png.
 # Everything else here is DEMO DATA (made up): the LITER (Volume) opening 13508, and both closings.
-# Pump says 181 L and P10,390 left the pump (implied P57.40/L, the posted price); the seeded diesel sales add up
-# to 174.216 L and P10,000, so 6.784 L and P390 (3.75%) are unaccounted.
+# Pump says 105 L and P9,922 left the pump (implied P94.50/L, the posted price); the seeded diesel sales add up
+# to 101 L and P9,544.50, so 4 L (3.81%) and P377.50 (3.80%) are unaccounted.
 DEMO_PUMP = {"name": "Diesel 2", "fuel_type": "Diesel", "amount_decimals": 0, "volume_decimals": 0}
 DEMO_OPENING = {"amount": "775397", "volume": "13508"}
-DEMO_CLOSING = {"amount": "785787", "volume": "13689"}
+DEMO_CLOSING = {"amount": "785319", "volume": "13613"}
 
 
 def seed_pumps(shift_id, start):
@@ -74,9 +76,9 @@ def seed(reset=False):
     start = datetime.now().replace(minute=0, second=0, microsecond=0) - timedelta(hours=3)
     sid = core.execute("INSERT INTO shifts (opened_at, attendant) VALUES (?, ?)",
                        (start.strftime("%Y-%m-%d %H:%M:%S"), "Demo Attendant"))
-    for minutes, fuel, amount in DEMO_SALES:
+    for minutes, fuel, liters in DEMO_SALES:
         when = (start + timedelta(minutes=minutes)).strftime("%Y-%m-%d %H:%M:%S")
-        data = dict({"fuel_type": fuel, "price_per_liter": DEMO_PRICES[fuel], "amount_pesos": amount, "source": "seed"},
+        data = dict({"fuel_type": fuel, "price_per_liter": DEMO_PRICES[fuel], "liters": liters, "source": "seed"},
                     **DEMO_SALE_EXTRAS.get(minutes, {}))
         rec, errors, _ = core.save_sale(data, shift_id=sid, created_at=when)
         assert not errors, errors

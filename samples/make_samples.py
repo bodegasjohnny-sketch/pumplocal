@@ -1,6 +1,8 @@
 """Generate SYNTHETIC sample pump-meter / receipt images for the demo (requires Pillow).
 
 These are computer-generated test images, not photos of a real pump or receipt.
+Prices are the real JCB pump prices as of Oct 9, 2026 (Premium 85.90, Unleaded 85.40, Diesel 94.50);
+liters x price = amount, rounded half-up (21.164 x 94.50 = 1,999.998 -> 2,000.00).
 The committed PNGs already exist; you only need this script to regenerate them.
 """
 import os
@@ -42,7 +44,7 @@ def receipt(name):
     lines = [
         ("c", "DEMO FUEL STATION", big), ("c", "Brgy. Sample, Philippines", f), ("c", "SALES INVOICE", fb), ("", "", f),
         ("l", "Date: 2026-10-09  10:42", f), ("l", "Pump: 2   Nozzle: 1", f), ("l", "-" * 34, f),
-        ("l", "Product:        DIESEL", fb), ("l", "Volume:      34.843 L", fb), ("l", "Price/L:    P 57.40", fb),
+        ("l", "Product:        DIESEL", fb), ("l", "Volume:      21.164 L", fb), ("l", "Price/L:    P 94.50", fb),
         ("l", "-" * 34, f), ("l", "TOTAL:     P 2,000.00", big), ("l", "-" * 34, f), ("l", "Cash:      P 2,000.00", f),
         ("l", "Change:    P     0.00", f), ("", "", f), ("c", "Thank you! Salamat po!", fb), ("", "", f),
         ("c", "SYNTHETIC SAMPLE", f), ("c", "not a real receipt", f),
@@ -59,7 +61,7 @@ def receipt(name):
 
 
 if __name__ == "__main__":
-    meter("meter_premium.png", "Premium", (230, 57, 70), "1000.00", "15.387", "64.99")
-    meter("meter_unleaded.png", "Unleaded", (42, 157, 143), "500.00", "8.163", "61.25")
+    meter("meter_premium.png", "Premium", (230, 57, 70), "1030.80", "12.000", "85.90")
+    meter("meter_unleaded.png", "Unleaded", (42, 157, 143), "512.40", "6.000", "85.40")
     receipt("receipt_diesel.png")
     print("Wrote synthetic samples to", OUT)

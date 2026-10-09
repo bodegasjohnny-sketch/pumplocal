@@ -31,10 +31,10 @@ sys.path.insert(0, HERE)
 
 # The three sale photos of DEMO_SCRIPT.md (Premium with a 20 peso senior discount)
 DEMO_SALES = [
-    {"fuel_type": "Premium", "liters": "15.387", "price_per_liter": "64.99", "amount_pesos": "1000.00",
+    {"fuel_type": "Premium", "liters": "12.000", "price_per_liter": "85.90", "amount_pesos": "1030.80",
      "discount_pesos": "20", "discount_reason": "senior", "source": "photo"},
-    {"fuel_type": "Unleaded", "liters": "8.163", "price_per_liter": "61.25", "amount_pesos": "500.00", "source": "photo"},
-    {"fuel_type": "Diesel", "liters": "34.843", "price_per_liter": "57.40", "amount_pesos": "2000.00", "source": "photo"},
+    {"fuel_type": "Unleaded", "liters": "6.000", "price_per_liter": "85.40", "amount_pesos": "512.40", "source": "photo"},
+    {"fuel_type": "Diesel", "liters": "21.164", "price_per_liter": "94.50", "amount_pesos": "2000.00", "source": "photo"},
 ]
 
 
@@ -67,8 +67,8 @@ class SlipParseTests(unittest.TestCase):
 
     def test_tilted_pieces_are_joined_into_rows(self):
         rows = slipparse.parse(fixture("closing_slip_photo.json"))["rows"]
-        for row in ("OPENING FLOAT 1,000.00", "NOZZLE O-RING 350.00", "MANG BEN - DIESEL 1,000.00",
-                    "CASH COUNTED 3,220.00"):
+        for row in ("OPENING FLOAT 1,000.00", "NOZZLE O-RING 350.00", "MANG BEN - DIESEL 945.00",
+                    "CASH COUNTED 3,263.20"):
             self.assertIn(row, rows)
 
     def test_ocr_noise_case_peso_signs_and_no_boxes(self):
@@ -129,7 +129,7 @@ class SlipShiftTests(unittest.TestCase):
         self.assertEqual([(x["customer"], x["status"]) for x in c["credits"]], [("Mang Ben", "new")])
         self.assertEqual(c["discounts"], {"slip": "20.00", "recorded": "20.00", "match": True})
         p = c["preview"]
-        self.assertEqual((p["expected"], p["declared"], p["diff"], p["status"]), ("3270.00", "3220.00", "-50.00", "SHORT"))
+        self.assertEqual((p["expected"], p["declared"], p["diff"], p["status"]), ("3313.20", "3263.20", "-50.00", "SHORT"))
 
     def test_apply_saves_only_new_items_once(self):
         before = core.shift_summary()
@@ -137,8 +137,8 @@ class SlipShiftTests(unittest.TestCase):
         self.assertEqual((len(r["saved_expenses"]), len(r["saved_credits"]), len(r["skipped"]), r["errors"]), (2, 1, 0, []))
         after = core.shift_summary()
         self.assertEqual(core.Decimal(after["expenses_total"]) - core.Decimal(before["expenses_total"]), 410)
-        self.assertEqual(core.Decimal(after["credit_total"]) - core.Decimal(before["credit_total"]), 1000)
-        self.assertEqual(after["total_amount"], "4500.00")  # the credit sale is a diesel sale at the posted price
+        self.assertEqual(core.Decimal(after["credit_total"]) - core.Decimal(before["credit_total"]), 945)
+        self.assertEqual(after["total_amount"], "4488.20")  # the credit sale is a diesel sale at the posted price
         again = core.slip_apply(self.slip)  # confirm pressed twice: nothing new
         self.assertEqual((again["saved_expenses"], again["saved_credits"], len(again["skipped"])), ([], [], 3))
         recheck = core.slip_compare(self.slip)
@@ -196,7 +196,7 @@ class SlipEndpointTests(unittest.TestCase):
                                                       "opening_float": j["slip"]["opening_float"],
                                                       "noncash": j["slip"]["noncash"]})
             self.assertEqual((c["result"]["expected"], c["result"]["diff"], c["result"]["status"]),
-                             ("3270.00", "-50.00", "SHORT"))
+                             ("3313.20", "-50.00", "SHORT"))
             code, sm = call(s.base, "/api/samples")
             self.assertEqual((sm["slip_samples"], len(sm["samples"])),
                              (["closing_slip_photo.jpg", "closing_slip_clean.png"], 3))

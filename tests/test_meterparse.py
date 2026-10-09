@@ -97,9 +97,9 @@ class SampleTests(unittest.TestCase):
     def test_fixture_files(self):
         """Saved Vision-format JSON (same shape ocr.swift prints) for each sample."""
         expected = {
-            "meter_premium.json": ("Premium", "15.387", "64.99", "1000.00"),
-            "meter_unleaded.json": ("Unleaded", "8.163", "61.25", "500.00"),
-            "receipt_diesel.json": ("Diesel", "34.843", "57.40", "2000.00"),
+            "meter_premium.json": ("Premium", "12.000", "85.90", "1030.80"),
+            "meter_unleaded.json": ("Unleaded", "6.000", "85.40", "512.40"),
+            "receipt_diesel.json": ("Diesel", "21.164", "94.50", "2000.00"),
         }
         for name, want in expected.items():
             with open(os.path.join(FIXTURES, name)) as f:

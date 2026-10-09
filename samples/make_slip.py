@@ -6,7 +6,7 @@
 - samples/closing_slip_answer.json what a correct read must return
 
 The filled numbers are made up and fit the Demo Day flow (DEMO_SCRIPT.md): python3 seed.py --demo-empty, then
-the three sale photos. With the slip the Cash Check expects P3,270.00 and P3,220.00 was counted: SHORT P50.00.
+the three sale photos. With the slip the Cash Check expects P3,313.20 and P3,263.20 was counted: SHORT P50.00.
 """
 import json
 import os
@@ -27,22 +27,23 @@ FILLED = {
     "opening_float": "1,000.00",
     "expenses": [("ICE AND WATER", "60.00"), ("NOZZLE O-RING", "350.00")],
     "discounts": "20.00",
-    "credits": [("MANG BEN - DIESEL", "1,000.00")],
+    "credits": [("MANG BEN - DIESEL", "945.00")],
     "gcash": "500.00",
     "card": "300.00",
-    "cash_counted": "3,220.00",
+    "cash_counted": "3,263.20",
 }
 ANSWER = {
     "_note": "Synthetic sample (made-up numbers) for the Demo Day flow in DEMO_SCRIPT.md (python3 seed.py --demo-empty, "
-             "then the 3 sale photos with a P20 senior discount on the Premium sale). Expected cash: 1,000 float + "
-             "4,500 gross (1,000 + 500 + 2,000 + Mang Ben's 1,000 credit) - 20 discount - 1,000 credit - 410 expenses "
-             "- 800 GCash/card = 3,270.00; counted 3,220.00 -> SHORT 50.00 (-1.53%).",
+             "then the 3 sale photos with a P20 senior discount on the Premium sale). Prices: real JCB pump prices "
+             "as of Oct 9, 2026. Expected cash: 1,000 float + 4,488.20 gross (1,030.80 + 512.40 + 2,000.00 + Mang Ben's "
+             "945.00 credit = 10 L diesel at 94.50) - 20 discount - 945 credit - 410 expenses - 800 GCash/card = "
+             "3,313.20; counted 3,263.20 -> SHORT 50.00 (-1.51%).",
     "date": "09 OCT 2026", "shift": "6AM - 2PM", "opening_float": "1000.00",
     "expenses": [{"description": "Ice and water", "amount_pesos": "60.00"},
                  {"description": "Nozzle o-ring", "amount_pesos": "350.00"}],
     "expenses_total": "410.00", "discounts": "20.00",
-    "credits": [{"customer": "Mang Ben", "fuel_type": "Diesel", "amount_pesos": "1000.00"}],
-    "credit_total": "1000.00", "gcash": "500.00", "card": "300.00", "noncash": "800.00", "cash_counted": "3220.00",
+    "credits": [{"customer": "Mang Ben", "fuel_type": "Diesel", "amount_pesos": "945.00"}],
+    "credit_total": "945.00", "gcash": "500.00", "card": "300.00", "noncash": "800.00", "cash_counted": "3263.20",
 }
 
 W, ROW = 1000, 84

@@ -4,8 +4,8 @@ They imitate the layout of the REAL photo (samples/real_totalizer_diesel2.png: m
 Cancel / Ok, a "DIESEL 2" sticker) but are computer-generated, with made-up closing numbers consistent with the
 real opening peso reading 775397 (see DEMO_SCRIPT.md):
 
-    synthetic_totalizer_diesel2_close_money.png   "2.Money All"   778611  (peso counter: +P3,214 this shift)
-    synthetic_totalizer_diesel2_close_volume.png  "1.Volume All"  13564   (liter counter: +56 L from 13508)
+    synthetic_totalizer_diesel2_close_money.png   "2.Money All"   778421  (peso counter: +P3,024 this shift)
+    synthetic_totalizer_diesel2_close_volume.png  "1.Volume All"  13540   (liter counter: +32 L from 13508)
 """
 import os
 
@@ -38,6 +38,6 @@ def screen(name, title, value):
 
 
 if __name__ == "__main__":
-    screen("synthetic_totalizer_diesel2_close_money.png", "2.Money All", "778611")
-    screen("synthetic_totalizer_diesel2_close_volume.png", "1.Volume All", "13564")
+    screen("synthetic_totalizer_diesel2_close_money.png", "2.Money All", "778421")
+    screen("synthetic_totalizer_diesel2_close_volume.png", "1.Volume All", "13540")
     print("ok")

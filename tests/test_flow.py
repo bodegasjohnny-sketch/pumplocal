@@ -98,9 +98,9 @@ class FakeOllama(BaseHTTPRequestHandler):
             FakeOllama.active -= 1
         msg = body["messages"][-1]
         if msg.get("images"):
-            content = 'Here you go:\n{"fuel_type":"diesel","liters":"34.843","price_per_liter":"P57.40","amount_pesos":"2,000.00"}'
+            content = 'Here you go:\n{"fuel_type":"diesel","liters":"21.164","price_per_liter":"P94.50","amount_pesos":"2,000.00"}'
         elif "QUESTION:" in msg["content"]:
-            content = "Ang benta ng Diesel ngayon ay ₱10,000.00, at may ₱99,999.00 pa."  # one hallucinated number
+            content = "Ang benta ng Diesel ngayon ay ₱9,544.50, at may ₱99,999.00 pa."  # one hallucinated number
         else:
             content = "Kulang ang cash. Bilangin ulit."
         self._send({"message": {"role": "assistant", "content": content}, "done": True})
@@ -187,42 +187,42 @@ class MockFlowTest(unittest.TestCase):
         self.assertEqual(st["sync"]["queued"], 21)
         self.assertTrue(st["sync"]["label"].startswith("Offline, 21 records queued"))
         code, sh = call(self.b, "/api/shift")
-        self.assertEqual((sh["count"], sh["total_amount"]), (15, "16350.00"))
+        self.assertEqual((sh["count"], sh["total_amount"]), (15, "15971.75"))
         self.assertEqual([f["fuel_type"] for f in sh["fuels"]], ["Premium", "Unleaded", "Diesel"])
 
     def test_3_photo_extract_then_correct_and_save(self):
         code, ex = call(self.b, "/api/extract", {"image": image_b64()})
         self.assertEqual(code, 200)
         self.assertTrue(ex["ok"])
-        self.assertEqual(ex["fields"], {"fuel_type": "Premium", "liters": "15.387", "price_per_liter": "64.99",
-                                        "amount_pesos": "1000.00"})
+        self.assertEqual(ex["fields"], {"fuel_type": "Premium", "liters": "12.000", "price_per_liter": "85.90",
+                                        "amount_pesos": "1030.80"})
         self.assertEqual(call(self.b, "/api/extract", {"image": ""})[0], 400)
         # staff corrects the amount to 1,500 and clears liters -> code recomputes liters
         fields = dict(ex["fields"], amount_pesos="1500", liters="", source="photo")
         code, saved = call(self.b, "/api/sales", fields)
         self.assertEqual(code, 200)
         self.assertEqual((saved["sale"]["liters"], saved["sale"]["amount_pesos"], saved["sale"]["synced"]),
-                         ("23.080", "1500.00", 0))
+                         ("17.462", "1500.00", 0))
         self.assertEqual(saved["sync"]["queued"], 22)
         code, err = call(self.b, "/api/sales", {"fuel_type": "Diesel", "amount_pesos": "100"})
         self.assertEqual(code, 400)
 
     def test_4_reconcile_preview(self):
-        code, r = call(self.b, "/api/reconcile", {"amount_pesos": "1000", "price_per_liter": "64.99"})
-        self.assertEqual(r["liters"], "15.387")
+        code, r = call(self.b, "/api/reconcile", {"amount_pesos": "1030.80", "price_per_liter": "85.90"})
+        self.assertEqual(r["liters"], "12.000")
 
     def test_5_cash_check_math(self):
-        # after test_3: gross sales = 16350 + 1500 = 17850. Seeded: discount 50, credit (utang) 3000, expenses 500.
-        # expected = 1000 float + 17850 - 50 - 3000 - 500 - 500 GCash/card = 14800
-        code, c = call(self.b, "/api/cashcheck", {"declared": "13450", "opening_float": "1000", "noncash": "500",
+        # after test_3: gross sales = 15971.75 + 1500 = 17471.75. Seeded: discount 50, credit (utang) 2835, expenses 500.
+        # expected = 1000 float + 17471.75 - 50 - 2835 - 500 - 500 GCash/card = 14586.75
+        code, c = call(self.b, "/api/cashcheck", {"declared": "13236.75", "opening_float": "1000", "noncash": "500",
                                                   "lang": "tl"})
         r = c["result"]
         self.assertEqual((r["sales_total"], r["expected"], r["diff"], r["diff_pct"], r["status"]),
-                         ("17850.00", "14800.00", "-1350.00", "-9.12", "SHORT"))
-        self.assertEqual((r["discounts"], r["credit_sales"], r["expenses"]), ("50.00", "3000.00", "500.00"))
+                         ("17471.75", "14586.75", "-1350.00", "-9.25", "SHORT"))
+        self.assertEqual((r["discounts"], r["credit_sales"], r["expenses"]), ("50.00", "2835.00", "500.00"))
         self.assertIn("kulang", c["explanation"])
         self.assertIn("₱1,350.00", c["explanation"])
-        code, c = call(self.b, "/api/cashcheck", {"declared": "14302"})
+        code, c = call(self.b, "/api/cashcheck", {"declared": "14088"})  # expected 14086.75 without float / GCash
         self.assertEqual(c["result"]["status"], "OK")
         self.assertEqual(call(self.b, "/api/cashcheck", {"declared": ""})[0], 400)
 
@@ -230,11 +230,11 @@ class MockFlowTest(unittest.TestCase):
         code, a = call(self.b, "/api/ask", {"question": "Magkano ang benta ng diesel ngayon?"})
         self.assertEqual(a["lang"], "tl")
         self.assertIn("Diesel", a["answer"])
-        self.assertIn("₱10,000.00", a["answer"])  # 1000+2500+1500+3000+800+1200
+        self.assertIn("₱9,544.50", a["answer"])  # (10+25+15+30+8.5+12.5) L x 94.50
         self.assertEqual(a["unverified_numbers"], [])
         code, a = call(self.b, "/api/ask", {"question": "What are total sales this shift?"})
         self.assertEqual(a["lang"], "en")
-        self.assertIn("₱17,850.00", a["answer"])
+        self.assertIn("₱17,471.75", a["answer"])
         code, a = call(self.b, "/api/ask", {"question": "May kulang ba sa cash?"})
         self.assertIn("Inaasahan", a["answer"])
 
@@ -243,7 +243,7 @@ class MockFlowTest(unittest.TestCase):
         sid = sh["sales"][0]["id"]
         call(self.b, "/api/sales/void", {"id": sid})
         code, sh = call(self.b, "/api/shift")
-        self.assertEqual(sh["total_amount"], "16350.00")
+        self.assertEqual(sh["total_amount"], "15971.75")
         code, s = call(self.b, "/api/sync", {})
         self.assertFalse(s["online"])
         self.assertTrue(s["label"].startswith("Offline"))
@@ -270,7 +270,7 @@ class SyncTest(unittest.TestCase):
             self.assertEqual((len(recs["expenses"]), len(recs["pumps"]), len(recs["totalizer_readings"])), (2, 1, 2))
             opening = [r for r in recs["totalizer_readings"] if r["kind"] == "open"][0]
             self.assertEqual((opening["amount"], opening["volume"]), ("775397", "13508"))
-            call(s.base, "/api/sales", {"fuel_type": "Diesel", "amount_pesos": "500", "price_per_liter": "57.40"})
+            call(s.base, "/api/sales", {"fuel_type": "Diesel", "amount_pesos": "500", "price_per_liter": "94.50"})
             srv.shutdown()
             srv.server_close()
             code, st = call(s.base, "/api/sync", {})
@@ -290,7 +290,7 @@ class RealAIPathTest(unittest.TestCase):
             code, st = call(s.base, "/api/status")
             self.assertTrue(st["ai"]["ok"])
             code, ex = call(s.base, "/api/extract", {"image": image_b64()})
-            self.assertEqual(ex["fields"], {"fuel_type": "Diesel", "liters": "34.843", "price_per_liter": "57.40",
+            self.assertEqual(ex["fields"], {"fuel_type": "Diesel", "liters": "21.164", "price_per_liter": "94.50",
                                             "amount_pesos": "2000.00"})
             sent = FakeOllama.last_chat
             self.assertEqual((sent["model"], sent["format"], sent["stream"]), ("gemma3:4b", "json", False))
@@ -299,7 +299,7 @@ class RealAIPathTest(unittest.TestCase):
             self.assertEqual(a["source"], "ai")
             self.assertIn("Diesel: 6 sales", FakeOllama.last_chat["messages"][0]["content"])
             self.assertEqual(a["unverified_numbers"], ["99,999.00"])
-            code, c = call(s.base, "/api/cashcheck", {"declared": "12450", "lang": "tl"})  # expected 12800
+            code, c = call(s.base, "/api/cashcheck", {"declared": "12236.75", "lang": "tl"})  # expected 12586.75
             self.assertEqual((c["explanation_source"], c["result"]["diff"]), ("ai", "-350.00"))
         finally:
             s.stop()
@@ -316,11 +316,11 @@ class RealAIPathTest(unittest.TestCase):
             self.assertEqual(code, 503)
             self.assertEqual(ex["fields"]["liters"], None)
             code, a = call(s.base, "/api/ask", {"question": "Total sales?"})
-            self.assertEqual((a["source"], "₱16,350.00" in a["answer"]), ("template-fallback", True))
-            code, c = call(s.base, "/api/cashcheck", {"declared": "12800"})
+            self.assertEqual((a["source"], "₱15,971.75" in a["answer"]), ("template-fallback", True))
+            code, c = call(s.base, "/api/cashcheck", {"declared": "12586.75"})
             self.assertEqual((c["result"]["status"], c["explanation_source"]), ("OK", "template-fallback"))
-            code, saved = call(s.base, "/api/sales", {"fuel_type": "Premium", "liters": "5", "price_per_liter": "64.99"})
-            self.assertEqual(saved["sale"]["amount_pesos"], "324.95")
+            code, saved = call(s.base, "/api/sales", {"fuel_type": "Premium", "liters": "5", "price_per_liter": "85.90"})
+            self.assertEqual(saved["sale"]["amount_pesos"], "429.50")
         finally:
             s.stop()
 
@@ -336,8 +336,8 @@ class PhotoReaderPipelineTest(unittest.TestCase):
         with open(os.path.join(FIXTURES, "meter_premium.json")) as f:
             d = json.load(f)
         for ln in d["lines"]:
-            if ln["text"] == "15.387":
-                ln["text"] = "75.387"  # misread digit: liters x price no longer equals amount
+            if ln["text"] == "12.000":
+                ln["text"] = "72.000"  # misread digit: liters x price no longer equals amount
         with open(cls.bad_json, "w") as f:
             json.dump(d, f)
 
@@ -364,7 +364,7 @@ class PhotoReaderPipelineTest(unittest.TestCase):
             code, ex = call(s.base, "/api/extract", {"image": image_b64(), "image_full": image_b64()})
             self.assertEqual(code, 200)
             self.assertEqual((ex["ok"], ex["source"], ex["reader"]), (True, "Apple Vision (on-device)", "vision"))
-            self.assertEqual(ex["fields"], {"fuel_type": "Diesel", "liters": "34.843", "price_per_liter": "57.40",
+            self.assertEqual(ex["fields"], {"fuel_type": "Diesel", "liters": "21.164", "price_per_liter": "94.50",
                                             "amount_pesos": "2000.00"})
             self.assertIsInstance(ex["seconds"], float)
             self.assertNotIn("fallback_reason", ex)
@@ -445,7 +445,7 @@ class PhotoReaderPipelineTest(unittest.TestCase):
         s = self.server(FAKE_OCR_JSON=self.bad_json, OLLAMA_URL="http://127.0.0.1:%d" % free_port())
         try:
             code, ex = call(s.base, "/api/extract", {"image": image_b64()})
-            self.assertEqual((code, ex["reader"], ex["fields"]["liters"]), (200, "vision", "75.387"))
+            self.assertEqual((code, ex["reader"], ex["fields"]["liters"]), (200, "vision", "72.000"))
             self.assertTrue(any("Gemma fallback unavailable" in w for w in ex["warnings"]))
         finally:
             s.stop()
