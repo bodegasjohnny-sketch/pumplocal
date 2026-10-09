@@ -43,7 +43,7 @@ class AskPromptTests(unittest.TestCase):
             return "Ang benta ng diesel ngayon ay ₱10,000.00. Hindi masasagot ng datos ang tanong nang eksakto."
 
         with mock.patch.object(ai, "chat", fake_chat), mock.patch.object(ai, "summary_context", lambda s: CONTEXT):
-            r = ai.ask("Magkano ang benta ng diesel ngayon?", {})
+            r = ai.ask("Bakit hindi tugma ang diesel ngayon?", {})  # free-form: goes to the model
         self.assertEqual((r["answer"], r["source"], r["lang"]), ("Ang benta ng diesel ngayon ay ₱10,000.00.", "ai", "tl"))
         self.assertEqual(r["unverified_numbers"], [])
         p = seen["prompt"]

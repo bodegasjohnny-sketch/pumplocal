@@ -295,7 +295,7 @@ class RealAIPathTest(unittest.TestCase):
             sent = FakeOllama.last_chat
             self.assertEqual((sent["model"], sent["format"], sent["stream"]), ("gemma3:4b", "json", False))
             self.assertFalse(sent["messages"][0]["images"][0].startswith("data:"))
-            code, a = call(s.base, "/api/ask", {"question": "Magkano ang benta ng diesel ngayon?"})
+            code, a = call(s.base, "/api/ask", {"question": "Bakit hindi tugma ang diesel?"})  # free-form -> model
             self.assertEqual(a["source"], "ai")
             self.assertIn("Diesel: 6 sales", FakeOllama.last_chat["messages"][0]["content"])
             self.assertEqual(a["unverified_numbers"], ["99,999.00"])
@@ -315,8 +315,10 @@ class RealAIPathTest(unittest.TestCase):
             code, ex = call(s.base, "/api/extract", {"image": image_b64()})
             self.assertEqual(code, 503)
             self.assertEqual(ex["fields"]["liters"], None)
-            code, a = call(s.base, "/api/ask", {"question": "Total sales?"})
-            self.assertEqual((a["source"], "₱15,971.75" in a["answer"]), ("template-fallback", True))
+            code, a = call(s.base, "/api/ask", {"question": "Total sales?"})  # fixed question: code, no model needed
+            self.assertEqual((a["source"], "₱15,971.75" in a["answer"]), ("code", True))
+            code, a = call(s.base, "/api/ask", {"question": "Bakit hindi tugma ang diesel?"})
+            self.assertEqual((a["source"], "₱9,544.50" in a["answer"]), ("template-fallback", True))
             code, c = call(s.base, "/api/cashcheck", {"declared": "12586.75"})
             self.assertEqual((c["result"]["status"], c["explanation_source"]), ("OK", "template-fallback"))
             code, saved = call(s.base, "/api/sales", {"fuel_type": "Premium", "liters": "5", "price_per_liter": "85.90"})
@@ -475,7 +477,7 @@ class StatusBusyTest(unittest.TestCase):
             FakeOllama.tags_delay, FakeOllama.chat_delay = 2.0, 2.5
             code, st = call(s.base, "/api/status")
             self.assertEqual((st["ai"]["ok"], st["ai"]["busy"], st["ai"]["detail"]), (True, False, "Local AI ready"))
-            t = threading.Thread(target=call, args=(s.base, "/api/ask", {"question": "Total sales?"}))
+            t = threading.Thread(target=call, args=(s.base, "/api/ask", {"question": "Why does the diesel not match?"}))
             t.start()
             time.sleep(0.5)
             code, st = call(s.base, "/api/status")

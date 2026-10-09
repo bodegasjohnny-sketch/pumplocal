@@ -65,7 +65,9 @@ class PumpFlowTest(unittest.TestCase):
         self.assertTrue(a["answer"].startswith("Oo."))
         self.assertEqual(a["unverified_numbers"], [])
         self.assertIn("Diesel pump check: " + HEADLINE, a["context"])
-        self.assertIn("peso totalizer opening 775397, closing 785319", a["context"])
+        self.assertIn("Diesel 2 (Diesel): dispensed this shift 105 L and ₱9,922.00.", a["context"])
+        self.assertNotIn("785319", a["context"])  # raw counter readings are not given to the model
+        self.assertNotIn("13613", a["context"])
         self.assertIn("Price check OK: implied ₱94.50/L", a["context"])
         code, a = call(self.b, "/api/ask", {"question": "Is any diesel unaccounted at the pump?"})
         self.assertIn(HEADLINE, a["answer"])

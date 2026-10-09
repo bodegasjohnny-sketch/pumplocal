@@ -87,10 +87,10 @@ class DemoScriptTest(unittest.TestCase):
         diesel2 = pump["pumps"][0]
         self.assertEqual(diesel2["name"], "Diesel 2")
 
-        # 1-3. Photo tab: three sale photos (20 peso senior discount typed on the Premium sale)
+        # 1-3. Photo tab: three sale photos, saved as read. The P20 senior discount is NOT typed here: it is on the
+        # closing slip, which applies it (Johnny's live run). Typing it as well is covered in test_slip.
         sales = []
-        for photo, extra in (("meter_premium.png", {"discount_pesos": "20", "discount_reason": "senior"}),
-                             ("meter_unleaded.png", {}), ("receipt_diesel.png", {})):
+        for photo, extra in (("meter_premium.png", {}), ("meter_unleaded.png", {}), ("receipt_diesel.png", {})):
             j = self.read("/api/extract", photo)
             self.assertTrue(j["ok"], j)
             f = j["fields"]
@@ -116,10 +116,12 @@ class DemoScriptTest(unittest.TestCase):
         c = j["compare"]
         self.assertEqual([e["status"] for e in c["expenses"]], ["new", "new"])
         self.assertEqual([(x["customer"], x["fuel_type"], x["status"]) for x in c["credits"]], [("Mang Ben", "Diesel", "new")])
-        self.assertEqual(c["discounts"], {"slip": "20.00", "recorded": "20.00", "match": True})
+        self.assertEqual(c["discounts"], {"slip": "20.00", "recorded": "0.00", "match": False, "from_slip": "20.00",
+                                         "after": "20.00"})
         self.assertEqual((c["preview"]["expected"], c["preview"]["diff"]), ("3313.20", "-50.00"))
         code, a = call(self.b, "/api/slip/apply", {"slip": j["slip"]})
-        self.assertEqual((code, len(a["saved_expenses"]), len(a["saved_credits"]), a["errors"]), (200, 2, 1, []))
+        self.assertEqual((code, len(a["saved_expenses"]), len(a["saved_credits"]), a["errors"], a["discount_from_slip"]),
+                         (200, 2, 1, [], "20.00"))
         code, cash = call(self.b, "/api/cashcheck", {"declared": j["slip"]["cash_counted"], "lang": "tl",
                                                      "opening_float": j["slip"]["opening_float"],
                                                      "noncash": j["slip"]["noncash"]})
@@ -138,17 +140,25 @@ class DemoScriptTest(unittest.TestCase):
         self.assertTrue(g["price"]["ok"])
         self.assertIn("implied ₱94.50/L", g["price"]["text"])
 
-        # 9-12. Ask
+        # 9-13. Ask: the five chip questions are answered by code ("Computed by PumpLocal"), exact numbers
         answers = {}
-        for q in ("Magkano ang benta ng diesel ngayon?", "What were total sales today?", "Is any diesel missing?",
-                  "May kulang ba sa cash?"):
+        for q in ("Magkano ang benta ng diesel ngayon?", "What are total sales this shift?",
+                  "Ilang litro ng Premium ang nabenta?", "May kulang ba sa cash?", "May kulang ba sa diesel?",
+                  "What were total sales today?", "Is any diesel missing?"):
             code, ans = call(self.b, "/api/ask", {"question": q})
             answers[q] = ans["answer"]
-            self.assertEqual(ans["unverified_numbers"], [], ans)
+            self.assertEqual((ans["source"], ans["unverified_numbers"]), ("code", []), ans)
+            self.assertIn(ans["answer"], open(os.path.join(ROOT, "DEMO_SCRIPT.md")).read())
+        self.assertEqual(answers["Ilang litro ng Premium ang nabenta?"],
+                         "12.000 L ang nabentang Premium ngayong shift (₱1,030.80, 1 benta).")
+        self.assertIn("ang hindi naitala", answers["May kulang ba sa diesel?"])
+        # 14. the free-form question goes to the local model (template in mock mode)
+        code, ans = call(self.b, "/api/ask", {"question": "Bakit hindi tugma ang diesel?"})
+        self.assertNotEqual(ans["source"], "code")
         self.assertIn("₱2,945.00", answers["Magkano ang benta ng diesel ngayon?"])
         self.assertIn("31.164", answers["Magkano ang benta ng diesel ngayon?"])
-        self.assertIn("₱4,488.20", answers["What were total sales today?"])
-        self.assertIn("49.164", answers["What were total sales today?"])
+        self.assertIn("₱4,488.20", answers["What are total sales this shift?"])
+        self.assertIn("49.164 L", answers["What are total sales this shift?"])
         self.assertIn("0.836 L", answers["Is any diesel missing?"])
         self.assertIn("₱79.00", answers["Is any diesel missing?"])
         self.assertIn("₱3,313.20", answers["May kulang ba sa cash?"])

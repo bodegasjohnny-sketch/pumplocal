@@ -627,13 +627,15 @@ def cash_explanation(r, lang="en"):
 def summary_context(s):
     lines = ["Shift started %s. Sales recorded: %d." % (s["shift"]["opened_at"], s["count"])]
     for f in s["fuels"]:
-        lines.append("%s: %d sales, %s liters, %s." % (f["fuel_type"], f["count"], f["liters"],
-                                                        core.peso(f["amount"])))
-    lines.append("TOTAL (gross sales): %s liters, %s." % (s["total_liters"], core.peso(s["total_amount"])))
+        lines.append("%s: %s, %s L, %s." % (f["fuel_type"], _n_sales(f["count"], "en"), f["liters"],
+                                             core.peso(f["amount"])))
+    lines.append("TOTAL (gross sales): %s L, %s." % (s["total_liters"], core.peso(s["total_amount"])))
     if "discounts_total" in s:
         reasons = ", ".join("%s %s" % (k or "other", core.peso(v)) for k, v in s["discounts_by_reason"].items())
-        lines.append("Discounts: %s on %d sales%s." % (core.peso(s["discounts_total"]), s["discount_count"],
-                                                       (" (" + reasons + ")") if reasons else ""))
+        lines.append("Discounts: %s (typed on %s%s%s)." % (
+            core.peso(s["discounts_total"]), _n_sales(s["discount_count"], "en"), (": " + reasons) if reasons else "",
+            ("; plus %s from the closing slip" % core.peso(s["discounts_from_slip"]))
+            if core.Decimal(s.get("discounts_from_slip") or 0) else ""))
         lines.append("Credit (utang) sales, not in the drawer: %s%s." % (core.peso(s["credit_total"]), "".join(
             "; %s: %s %s L, %s" % (c["customer"], c["fuel_type"], c["liters"], core.peso(c["amount"]))
             for c in s["credit_sales"])))
@@ -651,16 +653,15 @@ def summary_context(s):
         lines.append("No cash check yet this shift.")
     p = s.get("pump_check")
     if p and p.get("groups"):
-        lines.append("Pump meters (totalizer readings vs recorded sales; tolerance %s%%):" % p["tolerance_pct"])
+        # Only what left the pump this shift (closing - opening, computed in code). The raw lifetime counter
+        # readings are NOT given to the model: it mixed up "13540" (a counter) with liters dispensed.
+        lines.append("Pump meters (fuel dispensed this shift vs recorded sales; tolerance %s%%):" % p["tolerance_pct"])
         for r in p["pumps"]:
             if r["status"] == "NONE":
                 continue
-            lines.append("- %s (%s): peso totalizer opening %s, closing %s, dispensed %s; liter totalizer opening %s, "
-                         "closing %s, dispensed %s." % (
-                             r["name"], r["fuel_type"], r["opening_amount_value"] or "not recorded",
-                             r["closing_amount_value"] or "not recorded", r["dispensed_amount_text"] or "n/a",
-                             r["opening_volume_value"] or "not recorded", r["closing_volume_value"] or "not recorded",
-                             r["dispensed_volume_text"] or "n/a"))
+            lines.append("- %s (%s): dispensed this shift %s and %s." % (
+                r["name"], r["fuel_type"], r["dispensed_volume_text"] or "n/a (liters not recorded yet)",
+                r["dispensed_amount_text"] or "n/a (pesos not recorded yet)"))
         for g in p["groups"]:
             lines.append("- %s pump check: %s Status: %s." % (g["fuel_type"], g["headline"], g["status"]))
             if g.get("price"):
@@ -716,28 +717,44 @@ def pump_answer(question, s, lang):
     return " ".join(out)
 
 
+def _extras_answer(q, s, lang):
+    """Credit, expenses and discounts, from code, or None."""
+    if "credit_total" not in s:
+        return None
+    if any(w in q for w in ("utang", "credit", "charge", "pautang")):
+        names = ", ".join("%s %s" % (c["customer"], core.peso(c["amount"])) for c in s["credit_sales"])
+        if lang == "tl":
+            return "Utang ngayong shift: %s (%d)%s." % (core.peso(s["credit_total"]), len(s["credit_sales"]),
+                                                        (": " + names) if names else "")
+        return "Credit (utang) sales this shift: %s (%d)%s." % (core.peso(s["credit_total"]),
+                                                                 len(s["credit_sales"]), (": " + names) if names else "")
+    if any(w in q for w in ("gastos", "expense", "petty", "ginastos", "nagastos")):
+        items = ", ".join("%s %s" % (e["description"], core.peso(e["amount_pesos"])) for e in s["expenses"])
+        if lang == "tl":
+            return "Gastos ngayong shift: %s%s." % (core.peso(s["expenses_total"]), (": " + items) if items else "")
+        return "Expenses this shift: %s%s." % (core.peso(s["expenses_total"]), (": " + items) if items else "")
+    if any(w in q for w in ("discount", "diskwento", "senior", "pwd", "suki")):
+        slip = core.Decimal(s.get("discounts_from_slip") or 0)
+        if lang == "tl":
+            return "Diskwento ngayong shift: %s%s%s." % (
+                core.peso(s["discounts_total"]),
+                (" sa %d benta" % s["discount_count"]) if s["discount_count"] else "",
+                (" (%s mula sa closing slip)" % core.peso(slip)) if slip else "")
+        return "Discounts this shift: %s%s%s." % (
+            core.peso(s["discounts_total"]),
+            (" on %s" % _n_sales(s["discount_count"], lang)) if s["discount_count"] else "",
+            (" (%s from the closing slip)" % core.peso(slip)) if slip else "")
+    return None
+
+
 def template_answer(question, s, lang):
     q = (question or "").lower()
     pa = pump_answer(question, s, lang)
     if pa:
         return pa
-    if "credit_total" in s:
-        if any(w in q for w in ("utang", "credit", "charge", "pautang")):
-            names = ", ".join("%s %s" % (c["customer"], core.peso(c["amount"])) for c in s["credit_sales"])
-            if lang == "tl":
-                return "Utang ngayong shift: %s (%d)%s." % (core.peso(s["credit_total"]), len(s["credit_sales"]),
-                                                            (": " + names) if names else "")
-            return "Credit (utang) sales this shift: %s (%d)%s." % (core.peso(s["credit_total"]),
-                                                                     len(s["credit_sales"]), (": " + names) if names else "")
-        if any(w in q for w in ("gastos", "expense", "petty", "ginastos", "nagastos")):
-            items = ", ".join("%s %s" % (e["description"], core.peso(e["amount_pesos"])) for e in s["expenses"])
-            if lang == "tl":
-                return "Gastos ngayong shift: %s%s." % (core.peso(s["expenses_total"]), (": " + items) if items else "")
-            return "Expenses this shift: %s%s." % (core.peso(s["expenses_total"]), (": " + items) if items else "")
-        if any(w in q for w in ("discount", "diskwento", "senior", "pwd", "suki")):
-            if lang == "tl":
-                return "Diskwento ngayong shift: %s sa %d benta." % (core.peso(s["discounts_total"]), s["discount_count"])
-            return "Discounts this shift: %s on %d sales." % (core.peso(s["discounts_total"]), s["discount_count"])
+    ex = _extras_answer(q, s, lang)
+    if ex:
+        return ex
     if any(w in q for w in ("cash", "kulang", "sobra", "pera", "short", "over")):
         c = s.get("last_cash_check")
         if not c:
@@ -764,6 +781,69 @@ def template_answer(question, s, lang):
             core.peso(s["total_amount"]), s["total_liters"], s["count"])
     return "Total sales this shift: %s (%s liters, %d sales)." % (
         core.peso(s["total_amount"]), s["total_liters"], s["count"])
+
+
+# ---- Fixed questions (the chips and close matches) are answered by code, never by the model: on Oct 9, 2026 a live
+# test on the Mac got wrong wording from gemma3:4b for them (a raw counter read as liters, "49,164 liters", "Isa").
+SALES_WORDS = ("benta", "nabenta", "sales", "sold", "magkano", "how much", " kita ", "revenue", "naibenta", "binenta")
+LITER_WORDS = ("litro", "liter", "litre", "ilang l")
+TOTAL_WORDS = ("total", "kabuuan", "lahat", "all ", "overall", "today", "ngayon", "this shift", "shift")
+CASH_WORDS = ("cash", "pera", "kaha", "drawer")
+
+
+def _liters(x):
+    return "%s L" % x  # "49.164 L": a dot for decimals, never a thousands comma
+
+
+def _n_sales(n, lang):
+    return ("%d benta" % n) if lang == "tl" else ("%d sale%s" % (n, "" if n == 1 else "s"))
+
+
+def code_answer(question, s, lang):
+    """Exact answer from code for the fixed questions, in the question's language, or None (free-form -> model)."""
+    if not s or "fuels" not in s:
+        return None
+    q = " %s " % re.sub(r"\s+", " ", (question or "").lower().replace("gcash", "e-wallet"))
+    fuel = _fuel_in(q)
+    if any(w in q for w in CASH_WORDS):
+        c = s.get("last_cash_check")
+        if not c:
+            return ("Wala pang cash check ngayong shift. Gawin muna ang Check Cash sa Cash tab." if lang == "tl" else
+                    "No cash check yet this shift. Run Check Cash on the Cash tab first.")
+        return template_cash_text(c, lang) + (
+            " (Inaasahan: %s, nabilang: %s.)" % (core.peso(c["expected"]), core.peso(c["declared"])) if lang == "tl"
+            else " (Expected %s, declared %s.)" % (core.peso(c["expected"]), core.peso(c["declared"])))
+    pa = pump_answer(question, s, lang)
+    if pa:
+        return pa
+    ex = _extras_answer(q, s, lang)
+    if ex:
+        return ex
+    literish = any(w in q for w in LITER_WORDS)
+    salesish = any(w in q for w in SALES_WORDS)
+    if fuel and (literish or salesish):
+        f = next((x for x in s["fuels"] if x["fuel_type"] == fuel), None)
+        if not f:
+            return ("Wala pang benta ng %s ngayong shift." % fuel if lang == "tl" else
+                    "No %s sales yet this shift." % fuel)
+        if literish:
+            if lang == "tl":
+                return "%s ang nabentang %s ngayong shift (%s, %s)." % (
+                    _liters(f["liters"]), fuel, core.peso(f["amount"]), _n_sales(f["count"], lang))
+            return "%s of %s sold this shift (%s, %s)." % (_liters(f["liters"]), fuel, core.peso(f["amount"]),
+                                                            _n_sales(f["count"], lang))
+        if lang == "tl":
+            return "Ang benta ng %s ngayong shift ay %s (%s, %s)." % (
+                fuel, core.peso(f["amount"]), _liters(f["liters"]), _n_sales(f["count"], lang))
+        return "%s sales this shift: %s (%s, %s)." % (fuel, core.peso(f["amount"]), _liters(f["liters"]),
+                                                      _n_sales(f["count"], lang))
+    if not fuel and (salesish or literish) and (any(w in q for w in TOTAL_WORDS) or len(q.split()) <= 6):
+        if lang == "tl":
+            return "Kabuuang benta ngayong shift: %s (%s, %s)." % (
+                core.peso(s["total_amount"]), _liters(s["total_liters"]), _n_sales(s["count"], lang))
+        return "Total sales this shift: %s (%s, %s)." % (core.peso(s["total_amount"]), _liters(s["total_liters"]),
+                                                         _n_sales(s["count"], lang))
+    return None
 
 
 def _norm_numbers(text):
@@ -819,7 +899,10 @@ def strip_cant_answer(answer, context):
 def ask(question, s):
     lang = detect_lang(question)
     context = summary_context(s)
-    if core.MOCK_AI:
+    fixed = code_answer(question, s, lang)
+    if fixed:
+        answer, source = fixed, "code"
+    elif core.MOCK_AI:
         answer, source = template_answer(question, s, lang), "template"
     else:
         language = "Tagalog" if lang == "tl" else "English"
