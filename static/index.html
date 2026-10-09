@@ -125,7 +125,7 @@
     <div><h1>Pump<span>Local</span></h1><small id="station">Offline AI for gas stations · Gumagana kahit walang internet</small></div>
   </div>
   <div class="status">
-    <span class="pill" title="Local AI (Ollama on this computer)"><span class="dot" id="aiDot"></span><span id="aiLabel">Local AI…</span></span>
+    <span class="pill" id="aiPill" title="Local AI on this computer: Apple Vision OCR (photos) + Gemma via Ollama"><span class="dot" id="aiDot"></span><span id="aiLabel">Local AI…</span></span>
     <span class="pill" title="Cloud sync (the only part that needs internet)"><span class="dot" id="netDot"></span><span id="netLabel">Checking…</span></span>
     <button class="syncbtn" id="syncBtn">⟳ Sync</button>
   </div>
@@ -230,14 +230,15 @@
 </nav>
 
 <div class="overlay" id="overlay"><div class="spinner"></div><div id="overlayText">Working…</div>
-  <div style="font-size:13px;opacity:.8">Running on this computer. The first request can take a minute while the model loads.</div></div>
+  <div style="font-size:13px;opacity:.8" id="overlaySub">Running on this computer. The first request can take a minute while the model loads.</div></div>
 <div class="toast" id="toast"></div>
 
 <script>
 (function () {
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
-  var state = { model: "local model", fuel: "", lang: localStorage.getItem("pl_lang") || "en", source: "manual" };
+  var state = { model: "local model", fuel: "", lang: localStorage.getItem("pl_lang") || "en", source: "manual",
+    reader: "auto", vision: false };
 
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
     return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -277,9 +278,15 @@
   function loadStatus() {
     api("/api/status").then(function (j) {
       if (j.error) { $("aiDot").className = "dot off"; $("aiLabel").textContent = "Server stopped"; return; }
-      $("aiDot").className = "dot " + (j.ai.ok ? (j.ai.mock ? "warn" : "on") : "off");
       state.model = j.ai.model;
-      $("aiLabel").textContent = j.ai.ok ? ("Local AI ready · " + (j.ai.mock ? "MOCK" : j.ai.model)) : j.ai.detail;
+      state.reader = j.reader || "auto";
+      state.vision = !!(j.vision && j.vision.available) && state.reader !== "gemma";
+      var models = (state.vision ? "Vision OCR + " : "") + (j.ai.mock ? "MOCK" : j.ai.model);
+      $("aiDot").className = "dot " + (j.ai.ok ? ((j.ai.mock || j.ai.busy) ? "warn" : "on") : (state.vision ? "warn" : "off"));
+      if (j.ai.ok) $("aiLabel").textContent = (j.ai.busy ? "Local AI busy · " : "Local AI ready · ") + models;
+      else $("aiLabel").textContent = state.vision ? "Vision OCR ready · " + j.ai.detail : j.ai.detail;
+      $("aiPill").title = "Local AI on this computer. Photo reader: READER=" + state.reader +
+        ". Apple Vision OCR: " + ((j.vision && j.vision.detail) || "n/a") + ". Gemma: " + j.ai.detail;
       $("station").textContent = j.station + " · Offline AI · Gumagana kahit walang internet";
       renderSync(j.sync);
     });
@@ -313,30 +320,48 @@
     var img = new Image();
     img.onload = function () {
       // Downscale so the 4B model gets a small image (faster, less RAM).
-      var max = 768, w = img.width, h = img.height, k = Math.min(1, max / Math.max(w, h));
-      var c = document.createElement("canvas"); c.width = Math.round(w * k); c.height = Math.round(h * k);
-      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-      var dataUrl = c.toDataURL("image/jpeg", 0.88);
+      // Apple Vision OCR gets a sharper copy (up to 1600 px) for small receipt text.
+      function scaled(max, q) {
+        var w = img.width, h = img.height, k = Math.min(1, max / Math.max(w, h));
+        var c = document.createElement("canvas"); c.width = Math.round(w * k); c.height = Math.round(h * k);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        return c.toDataURL("image/jpeg", q);
+      }
+      var dataUrl = scaled(768, 0.88);
+      var full = state.reader !== "gemma" ? scaled(1600, 0.92) : null;
       $("preview").src = dataUrl; $("preview").style.display = "block";
-      extract(dataUrl);
+      extract(dataUrl, full);
     };
     img.onerror = function () { toast("Could not open that image."); };
     img.src = url;
   }
 
-  function extract(dataUrl) {
-    busy(true, "Reading photo with local AI… · Binabasa ang litrato…");
-    api("/api/extract", { image: dataUrl }).then(function (j) {
+  function readerLine(j) {
+    if (!j.source || !j.ok) return "";
+    var icon = j.reader === "vision" ? "⚡" : "🤖";
+    var n = Number(j.seconds), secs = "";
+    if (j.seconds !== undefined && j.seconds !== null && !isNaN(n)) secs = " in " + (n < 0.1 ? "<0.1" : n.toFixed(1)) + "s";
+    return '<div class="note info"><b>' + icon + " Read by " + esc(j.source) + secs + "</b> · on this computer</div>";
+  }
+  function extract(dataUrl, full) {
+    busy(true, "Reading photo on this computer… · Binabasa ang litrato…");
+    $("overlaySub").textContent = state.reader === "gemma" || !state.vision
+      ? "Gemma (" + state.model + ") is reading the photo. This can take a few minutes on a laptop."
+      : "Apple Vision OCR first (usually about a second). Gemma only if the numbers don't add up.";
+    var body = { image: dataUrl }; if (full) body.image_full = full;
+    api("/api/extract", body).then(function (j) {
       busy(false);
+      $("overlaySub").textContent = "Running on this computer. The first request can take a minute while the model loads.";
       var f = j.fields || {};
       setFuel(f.fuel_type || "");
       $("liters").value = f.liters || ""; $("price").value = f.price_per_liter || ""; $("amount").value = f.amount_pesos || "";
       state.source = j.ok ? "photo" : "manual";
-      var html = "";
-      if (j.ok) html += '<div class="note info">🤖 ' + esc(j.message) + (j.seconds ? " (" + j.seconds + "s)" : "") + "</div>";
+      var html = readerLine(j);
+      if (j.fallback_reason) html += '<div class="note warn">' + esc(j.fallback_reason) + "</div>";
+      if (j.ok) html += '<div class="note info">' + esc(j.message) + "</div>";
       else html += '<div class="note err">⚠️ ' + esc(j.message || j.error) + (j.error && j.message ? "<br><small>" + esc(j.error) + "</small>" : "") + "</div>";
       (j.warnings || []).forEach(function (w) { html += '<div class="note warn">' + esc(w) + "</div>"; });
-      if (j.raw) html += "<details><summary>Model output</summary><pre>" + esc(j.raw) + "</pre></details>";
+      if (j.raw) html += "<details><summary>" + (j.reader === "vision" ? "OCR text" : "Model output") + "</summary><pre>" + esc(j.raw) + "</pre></details>";
       $("extractMsg").innerHTML = html;
       recalc();
     });
